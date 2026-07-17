@@ -41,8 +41,8 @@ export const reviewsService = {
 
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
-  listAll(page: number, limit: number, rating?: number) {
-    return reviewsRepository.listAll(page, limit, rating);
+  listAll(page: number, limit: number, rating?: number, sortBy?: 'rating' | 'date', sortOrder?: 'asc' | 'desc') {
+    return reviewsRepository.listAll(page, limit, rating, sortBy, sortOrder);
   },
 
   async remove(id: string): Promise<void> {
