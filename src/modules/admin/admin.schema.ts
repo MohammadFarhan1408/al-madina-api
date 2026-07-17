@@ -66,6 +66,8 @@ export const updateCollectionSchema = createCollectionSchema.partial().refine(
 );
 export const collectionProductSchema = z.object({ productId: objectId });
 
+const sortOrderSchema = z.enum(['asc', 'desc']).optional().default('desc');
+
 // ─── Orders ────────────────────────────────────────────────────────────────────
 export const updateOrderStatusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
 export const adminOrdersQuerySchema = z.object({
@@ -74,6 +76,8 @@ export const adminOrdersQuerySchema = z.object({
   status: z.enum(ORDER_STATUSES).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
+  sortBy: z.enum(['reference', 'placedAt', 'total', 'status']).optional().default('placedAt'),
+  sortOrder: sortOrderSchema,
 });
 
 // ─── Customers ─────────────────────────────────────────────────────────────────
@@ -81,6 +85,9 @@ export const adminUsersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
   limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
   tier: z.enum(USER_TIERS).optional(),
+  q: z.string().trim().min(1).optional(),
+  sortBy: z.enum(['fullName', 'email', 'tier', 'memberSince']).optional().default('memberSince'),
+  sortOrder: sortOrderSchema,
 });
 export const updateTierSchema = z.object({ tier: z.enum(USER_TIERS) });
 
@@ -92,11 +99,18 @@ export const broadcastSchema = z.object({
   tier: z.enum(USER_TIERS).optional(), // segment target; omit = all users
 });
 
+export const notificationHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
+  limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
+});
+
 // ─── Reviews ───────────────────────────────────────────────────────────────────
 export const adminReviewsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
   limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
   rating: z.coerce.number().int().min(1).max(5).optional(),
+  sortBy: z.enum(['rating', 'date']).optional().default('date'),
+  sortOrder: sortOrderSchema,
 });
 
 // ─── Upload ────────────────────────────────────────────────────────────────────
