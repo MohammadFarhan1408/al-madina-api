@@ -7,10 +7,29 @@ import {
   ORDER_STATUSES,
   USER_TIERS,
   NOTIFICATION_KINDS,
+  PRODUCT_VARIANT_SIZES_ML,
   PAGINATION,
 } from '../../constants/business';
 
 const objectId = z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid id' });
+
+const seoFields = {
+  slug: z.string().trim().min(2).optional(),
+  metaTitle: z.string().trim().optional(),
+  metaDescription: z.string().trim().optional(),
+  metaKeywords: z.array(z.string().trim()).optional(),
+};
+
+const productVariantSchema = z.object({
+  volumeMl: z.coerce.number().refine((v) => (PRODUCT_VARIANT_SIZES_ML as readonly number[]).includes(v), {
+    message: 'volumeMl must be one of the standard sizes',
+  }),
+  price: z.coerce.number().min(0),
+  sku: z.string().trim().min(2),
+  barcode: z.string().trim().optional(),
+  stock: z.coerce.number().int().min(0).default(0),
+  inStock: z.boolean().optional(),
+});
 
 // ─── Products ──────────────────────────────────────────────────────────────────
 export const createProductSchema = z.object({
@@ -32,6 +51,9 @@ export const createProductSchema = z.object({
   isBestSeller: z.boolean().optional(),
   isSignature: z.boolean().optional(),
   isSeasonal: z.boolean().optional(),
+  variants: z.array(productVariantSchema).default([]),
+  tagIds: z.array(objectId).default([]),
+  ...seoFields,
 });
 
 export const updateProductSchema = createProductSchema.partial().refine(
@@ -45,6 +67,7 @@ export const createCategorySchema = z.object({
   tagline: z.string().trim().optional(),
   image: z.string().url(),
   sortOrder: z.coerce.number().int().optional(),
+  ...seoFields,
 });
 export const updateCategorySchema = createCategorySchema.partial().refine(
   (d) => Object.keys(d).length > 0,
@@ -59,6 +82,7 @@ export const createCollectionSchema = z.object({
   accent: z.enum(COLLECTION_ACCENTS),
   productIds: z.array(objectId).default([]),
   sortOrder: z.coerce.number().int().optional(),
+  ...seoFields,
 });
 export const updateCollectionSchema = createCollectionSchema.partial().refine(
   (d) => Object.keys(d).length > 0,

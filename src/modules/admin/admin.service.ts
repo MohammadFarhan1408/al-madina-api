@@ -7,11 +7,13 @@ import { collectionsRepository } from '../collections/collections.repository';
 import { collectionsService } from '../collections/collections.service';
 import { ordersRepository } from '../orders/orders.repository';
 import { notificationsRepository } from '../notifications/notifications.repository';
-import { User } from '../../database/models';
+import { addressesRepository } from '../addresses/addresses.repository';
+import { User, Cart } from '../../database/models';
 import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { uploadToCloudinary, type UploadType } from '../../storage/upload';
 import { queuePush } from '../../jobs/queues/push.queue';
+import { slugify } from '../../utils/slugify';
 import { Types } from 'mongoose';
 import type { UserTier, OrderStatus, NotificationKind } from '../../constants/business';
 import type { IProduct, ICategory, ICollection } from '../../database/models';
@@ -22,6 +24,7 @@ export const adminService = {
     if (!(await categoriesRepository.exists(String(data.categoryId)))) {
       throw ApiError.badRequest('Category does not exist', ERROR_CODES.CATEGORY_NOT_FOUND);
     }
+    if (!data.slug && data.name) data.slug = slugify(data.name);
     const product = await productsRepository.create(data);
     await productsService.invalidateAll();
     return product;
@@ -54,6 +57,7 @@ export const adminService = {
 
   // ─── Categories ──────────────────────────────────────────────────────────────
   async createCategory(data: Partial<ICategory>): Promise<ICategory> {
+    if (!data.slug && data.name) data.slug = slugify(data.name);
     const category = await categoriesRepository.create(data);
     await categoriesService.invalidateCache();
     return category;
@@ -74,6 +78,7 @@ export const adminService = {
 
   // ─── Collections ───────────────────────────────────────────────────────────────
   async createCollection(data: Partial<ICollection>): Promise<ICollection> {
+    if (!data.slug && data.title) data.slug = slugify(data.title);
     const collection = await collectionsRepository.create({
       ...data,
       productCount: data.productIds?.length ?? 0,
@@ -161,8 +166,12 @@ export const adminService = {
   async getUser(id: string) {
     const user = await adminRepository.findUserById(id);
     if (!user) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
-    const orders = await ordersRepository.listByUser(id, 1, 20);
-    return { user, orders: orders.items };
+    const [orders, addresses, cart] = await Promise.all([
+      ordersRepository.listByUser(id, 1, 20),
+      addressesRepository.listForUserAdmin(id),
+      Cart.findOne({ userId: id }).populate('items.productId').lean().exec(),
+    ]);
+    return { user, recentOrders: orders.items, addresses, cart: cart?.items ?? [] };
   },
 
   async updateUserTier(id: string, tier: UserTier) {
