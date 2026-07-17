@@ -16,12 +16,14 @@ export const reviewsController = {
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
   async listAll(req: Request, res: Response): Promise<void> {
-    const { page, limit, rating } = req.query as unknown as {
+    const { page, limit, rating, sortBy, sortOrder } = req.query as unknown as {
       page: number;
       limit: number;
       rating?: number;
+      sortBy?: 'rating' | 'date';
+      sortOrder?: 'asc' | 'desc';
     };
-    const result = await reviewsService.listAll(page, limit, rating);
+    const result = await reviewsService.listAll(page, limit, rating, sortBy, sortOrder);
     sendSuccess(res, result);
   },
 
