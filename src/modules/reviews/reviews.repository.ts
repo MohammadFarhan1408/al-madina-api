@@ -57,10 +57,17 @@ export const reviewsRepository = {
 
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
-  listAll(page: number, limit: number, rating?: number): Promise<Paginated<IReview>> {
+  listAll(
+    page: number,
+    limit: number,
+    rating?: number,
+    sortBy: 'rating' | 'date' = 'date',
+    sortOrder: 'asc' | 'desc' = 'desc',
+  ): Promise<Paginated<IReview>> {
     const filter: Record<string, unknown> = { deletedAt: null };
     if (rating) filter.rating = rating;
-    return paginate<IReview>(Review, filter, { page, limit, sort: { createdAt: -1 } });
+    const field = sortBy === 'rating' ? 'rating' : 'date';
+    return paginate<IReview>(Review, filter, { page, limit, sort: { [field]: sortOrder === 'asc' ? 1 : -1 } });
   },
 
   async softDelete(id: string): Promise<IReview | null> {
