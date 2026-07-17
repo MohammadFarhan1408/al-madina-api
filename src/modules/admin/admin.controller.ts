@@ -66,8 +66,15 @@ export const adminController = {
 
   // Customers
   async listUsers(req: Request, res: Response) {
-    const { page, limit, tier } = req.query as never as { page: number; limit: number; tier?: never };
-    sendSuccess(res, await adminService.listUsers(page, limit, tier));
+    const { page, limit, tier, sortBy, sortOrder, q } = req.query as never as {
+      page: number;
+      limit: number;
+      tier?: never;
+      sortBy?: 'fullName' | 'email' | 'tier' | 'memberSince';
+      sortOrder?: 'asc' | 'desc';
+      q?: string;
+    };
+    sendSuccess(res, await adminService.listUsers(page, limit, tier, sortBy, sortOrder, q));
   },
   async getUser(req: Request, res: Response) {
     sendSuccess(res, await adminService.getUser(req.params.id));
@@ -83,6 +90,10 @@ export const adminController = {
   // Notifications
   async broadcast(req: Request, res: Response) {
     sendCreated(res, await adminService.broadcast(req.body));
+  },
+  async notificationHistory(req: Request, res: Response) {
+    const { page, limit } = req.query as never as { page: number; limit: number };
+    sendSuccess(res, await adminService.notificationHistory(page, limit));
   },
 
   // Upload
