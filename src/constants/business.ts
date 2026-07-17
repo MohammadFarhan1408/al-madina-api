@@ -93,3 +93,11 @@ export const UPLOAD_LIMITS = {
   CATEGORY_MAX_BYTES: 10 * 1024 * 1024, // 10 MB
   ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
 } as const;
+
+/** Standard bottle sizes (ml) offered as product variants. */
+export const PRODUCT_VARIANT_SIZES_ML = [3, 6, 12, 30, 50, 100] as const;
+export type ProductVariantSizeMl = (typeof PRODUCT_VARIANT_SIZES_ML)[number];
+
+/** Coupon discount types. */
+export const DISCOUNT_TYPES = ['percentage', 'fixed'] as const;
+export type DiscountType = (typeof DISCOUNT_TYPES)[number];
