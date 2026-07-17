@@ -56,7 +56,13 @@ export const ordersRepository = {
   listAll(
     page: number,
     limit: number,
-    filters: { status?: OrderStatus; from?: Date; to?: Date } = {},
+    filters: {
+      status?: OrderStatus;
+      from?: Date;
+      to?: Date;
+      sortBy?: 'reference' | 'placedAt' | 'total' | 'status';
+      sortOrder?: 'asc' | 'desc';
+    } = {},
   ): Promise<Paginated<IOrder>> {
     const filter: FilterQuery<IOrder> = { deletedAt: null };
     if (filters.status) filter.status = filters.status;
@@ -65,7 +71,9 @@ export const ordersRepository = {
       if (filters.from) filter.placedAt.$gte = filters.from;
       if (filters.to) filter.placedAt.$lte = filters.to;
     }
-    return paginate<IOrder>(Order, filter, { page, limit, sort: { placedAt: -1 } });
+    const sortBy = filters.sortBy ?? 'placedAt';
+    const sortOrder = filters.sortOrder === 'asc' ? 1 : -1;
+    return paginate<IOrder>(Order, filter, { page, limit, sort: { [sortBy]: sortOrder } });
   },
 
   updateStatus(id: string, status: OrderStatus): Promise<IOrder | null> {
