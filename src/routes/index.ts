@@ -10,6 +10,8 @@ import { usersRoutes } from '../modules/users/users.routes';
 import { searchRoutes } from '../modules/search/search.routes';
 import { contactRoutes } from '../modules/contact/contact.module';
 import { cartRoutes } from '../modules/cart/cart.module';
+import { tagsRoutes } from '../modules/tags/tags.routes';
+import { addressesRoutes } from '../modules/addresses/addresses.routes';
 import { adminRoutes } from '../modules/admin/admin.routes';
 
 /**
@@ -28,6 +30,8 @@ router.use('/users', usersRoutes);
 router.use('/search', searchRoutes);
 router.use('/contact', contactRoutes);
 router.use('/cart', cartRoutes);
+router.use('/tags', tagsRoutes);
+router.use('/addresses', addressesRoutes);
 router.use('/admin', adminRoutes);
 
 export const apiRouter = router;
