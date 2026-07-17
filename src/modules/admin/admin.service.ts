@@ -113,11 +113,21 @@ export const adminService = {
   },
 
   // ─── Orders ────────────────────────────────────────────────────────────────────
-  listOrders(query: { page: number; limit: number; status?: OrderStatus; from?: Date; to?: Date }) {
+  listOrders(query: {
+    page: number;
+    limit: number;
+    status?: OrderStatus;
+    from?: Date;
+    to?: Date;
+    sortBy?: 'reference' | 'placedAt' | 'total' | 'status';
+    sortOrder?: 'asc' | 'desc';
+  }) {
     return ordersRepository.listAll(query.page, query.limit, {
       status: query.status,
       from: query.from,
       to: query.to,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
     });
   },
 
@@ -137,8 +147,15 @@ export const adminService = {
   },
 
   // ─── Customers ───────────────────────────────────────────────────────────────
-  listUsers(page: number, limit: number, tier?: UserTier) {
-    return adminRepository.listUsers(page, limit, tier);
+  listUsers(
+    page: number,
+    limit: number,
+    tier?: UserTier,
+    sortBy?: 'fullName' | 'email' | 'tier' | 'memberSince',
+    sortOrder?: 'asc' | 'desc',
+    q?: string,
+  ) {
+    return adminRepository.listUsers(page, limit, tier, sortBy, sortOrder, q);
   },
 
   async getUser(id: string) {
@@ -174,6 +191,10 @@ export const adminService = {
     if (docs.length > 0) await notificationsRepository.insertMany(docs);
     void queuePush({ type: 'promo-broadcast', tier: input.tier, title: input.title, body: input.body });
     return { recipients: docs.length };
+  },
+
+  notificationHistory(page: number, limit: number) {
+    return adminRepository.listBroadcasts(page, limit);
   },
 
   // ─── Upload ──────────────────────────────────────────────────────────────────
