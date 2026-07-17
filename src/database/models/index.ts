@@ -17,3 +17,9 @@ export {
 export { Notification, type INotification } from './notification.model';
 export { ContactSubmission, type IContactSubmission } from './contact-submission.model';
 export { AuditLog, type IAuditLog } from './audit-log.model';
+export { Coupon, type ICoupon } from './coupon.model';
+export { Cart, type ICart, type ICartItem } from './cart.model';
+export { Role, type IRole } from './role.model';
+export { Permission, type IPermission } from './permission.model';
+export { Tag, type ITag } from './tag.model';
+export { Address, type IAddress } from './address.model';

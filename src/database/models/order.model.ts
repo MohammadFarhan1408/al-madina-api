@@ -42,6 +42,8 @@ export interface IOrder extends Document {
   shipping: number;
   total: number;
   currency: string;
+  couponCode?: string;
+  discountAmount: number;
   placedAt: Date;
   deletedAt?: Date | null;
   createdAt: Date;
@@ -85,6 +87,8 @@ const orderSchema = new Schema<IOrder>(
     shipping: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true, min: 0 },
     currency: { type: String, default: DEFAULT_CURRENCY, maxlength: 3 },
+    couponCode: { type: String, uppercase: true, trim: true },
+    discountAmount: { type: Number, default: 0, min: 0 },
     placedAt: { type: Date, default: Date.now },
     deletedAt: { type: Date, default: null, index: true },
   },

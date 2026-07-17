@@ -4,9 +4,19 @@ import {
   SCENT_FAMILIES,
   PRODUCT_BADGES,
   DEFAULT_CURRENCY,
+  PRODUCT_VARIANT_SIZES_ML,
   type ScentFamily,
   type ProductBadge,
 } from '../../constants/business';
+
+export interface IProductVariant {
+  volumeMl: number;
+  price: number;
+  sku: string;
+  barcode?: string;
+  stock: number;
+  inStock: boolean;
+}
 
 export interface IProduct extends Document {
   _id: Types.ObjectId;
@@ -31,10 +41,32 @@ export interface IProduct extends Document {
   isBestSeller: boolean;
   isSignature: boolean;
   isSeasonal: boolean;
+  variants: IProductVariant[];
+  tagIds: Types.ObjectId[];
+  slug?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string[];
   deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const productVariantSchema = new Schema<IProductVariant>(
+  {
+    volumeMl: { type: Number, required: true, enum: PRODUCT_VARIANT_SIZES_ML },
+    price: { type: Number, required: true, min: 0 },
+    // Not `unique: true` — that builds a single collection-wide index on
+    // `variants.sku` that collides once two products both have an empty
+    // `variants` array (both index as null). SKU uniqueness within a
+    // product's own variants is enforced at the application layer instead.
+    sku: { type: String, required: true, trim: true, uppercase: true },
+    barcode: { type: String, trim: true },
+    stock: { type: Number, required: true, min: 0, default: 0 },
+    inStock: { type: Boolean, default: true },
+  },
+  { _id: false },
+);
 
 const productSchema = new Schema<IProduct>(
   {
@@ -59,6 +91,12 @@ const productSchema = new Schema<IProduct>(
     isBestSeller: { type: Boolean, default: false },
     isSignature: { type: Boolean, default: false },
     isSeasonal: { type: Boolean, default: false },
+    variants: { type: [productVariantSchema], default: [] },
+    tagIds: { type: [Schema.Types.ObjectId], ref: 'Tag', default: [] },
+    slug: { type: String, unique: true, sparse: true, trim: true, index: true },
+    metaTitle: { type: String, trim: true },
+    metaDescription: { type: String, trim: true },
+    metaKeywords: { type: [String], default: undefined },
     deletedAt: { type: Date, default: null, index: true },
   },
   baseSchemaOptions,

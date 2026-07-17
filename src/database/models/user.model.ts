@@ -8,6 +8,7 @@ export interface IUser extends Document {
   passwordHash: string;
   avatar?: string;
   role: UserRole;
+  roleId?: Types.ObjectId | null;
   tier: UserTier;
   memberSince: Date;
   isEmailVerified: boolean;
@@ -40,6 +41,8 @@ const userSchema = new Schema<IUser>(
     passwordHash: { type: String, required: true, select: false },
     avatar: { type: String },
     role: { type: String, enum: USER_ROLES, default: 'user', index: true },
+    // Informational only — enforcement stays on `role` above (see AGENTS.md).
+    roleId: { type: Schema.Types.ObjectId, ref: 'Role', default: null },
     tier: { type: String, enum: USER_TIERS, default: 'Member', index: true },
     memberSince: { type: Date, default: Date.now },
     isEmailVerified: { type: Boolean, default: false },

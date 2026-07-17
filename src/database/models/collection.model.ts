@@ -17,6 +17,10 @@ export interface ICollection extends Document {
   productIds: Types.ObjectId[];
   productCount: number;
   sortOrder: number;
+  slug?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +34,10 @@ const collectionSchema = new Schema<ICollection>(
     productIds: [{ type: Schema.Types.ObjectId, ref: 'Product', index: true }],
     productCount: { type: Number, default: 0, min: 0 },
     sortOrder: { type: Number, default: 0, index: true },
+    slug: { type: String, unique: true, sparse: true, trim: true, index: true },
+    metaTitle: { type: String, trim: true },
+    metaDescription: { type: String, trim: true },
+    metaKeywords: { type: [String], default: undefined },
   },
   baseSchemaOptions,
 );
