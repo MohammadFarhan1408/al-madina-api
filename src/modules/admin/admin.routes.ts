@@ -14,6 +14,7 @@ import {
   adminUsersQuerySchema,
   updateTierSchema,
   broadcastSchema,
+  notificationHistoryQuerySchema,
   adminReviewsQuerySchema,
   uploadQuerySchema,
 } from './admin.schema';
@@ -60,6 +61,7 @@ router.patch('/users/:id/tier', validate({ params: objectIdParam(), body: update
 router.delete('/users/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.deactivateUser));
 
 // ─── Notifications broadcast ─────────────────────────────────────────────────────
+router.get('/notifications', validate({ query: notificationHistoryQuerySchema }), asyncHandler(adminController.notificationHistory));
 router.post('/notifications', validate({ body: broadcastSchema }), asyncHandler(adminController.broadcast));
 
 // ─── Reviews ───────────────────────────────────────────────────────────────────
