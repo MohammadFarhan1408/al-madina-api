@@ -63,6 +63,12 @@ export const adminController = {
   async orderStats(_req: Request, res: Response) {
     sendSuccess(res, await adminService.orderStats());
   },
+  async orderTransactions(req: Request, res: Response) {
+    sendSuccess(res, await adminService.orderTransactions(req.params.id));
+  },
+  async refundPayment(req: Request, res: Response) {
+    sendSuccess(res, await adminService.refundPayment(req.body.transactionId));
+  },
 
   // Customers
   async listUsers(req: Request, res: Response) {

@@ -6,6 +6,8 @@ import { categoriesService } from '../categories/categories.service';
 import { collectionsRepository } from '../collections/collections.repository';
 import { collectionsService } from '../collections/collections.service';
 import { ordersRepository } from '../orders/orders.repository';
+import { ordersService } from '../orders/orders.service';
+import { paymentsService } from '../payments/payments.service';
 import { notificationsRepository } from '../notifications/notifications.repository';
 import { addressesRepository } from '../addresses/addresses.repository';
 import { User, Cart } from '../../database/models';
@@ -137,10 +139,17 @@ export const adminService = {
   },
 
   async updateOrderStatus(id: string, status: OrderStatus) {
-    const order = await ordersRepository.updateStatus(id, status);
-    if (!order) throw ApiError.notFound('Order not found', ERROR_CODES.ORDER_NOT_FOUND);
-    // TODO (Stage 8): notify the customer of the status change.
-    return order;
+    // Delegates to ordersService.updateStatus, which also notifies the customer
+    // (email on shipped, in-app notification, push) — see orders.service.ts.
+    return ordersService.updateStatus(id, status);
+  },
+
+  orderTransactions(orderId: string) {
+    return paymentsService.listForOrder(orderId);
+  },
+
+  refundPayment(transactionId: string) {
+    return paymentsService.refund(transactionId);
   },
 
   async orderStats() {

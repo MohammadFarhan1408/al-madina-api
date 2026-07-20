@@ -3,6 +3,7 @@ import { adminController } from './admin.controller';
 import { reviewsController } from '../reviews/reviews.controller';
 import { couponsController } from '../coupons/coupons.controller';
 import { createCouponSchema, updateCouponSchema, adminCouponsQuerySchema } from '../coupons/coupons.schema';
+import { refundPaymentSchema } from '../payments/payments.schema';
 import { rolesController } from '../roles/roles.controller';
 import { createRoleSchema, updateRoleSchema } from '../roles/roles.schema';
 import { tagsController } from '../tags/tags.controller';
@@ -59,6 +60,8 @@ router.delete('/collections/:id/products/:productId', validate({ params: objectI
 router.get('/orders', validate({ query: adminOrdersQuerySchema }), asyncHandler(adminController.listOrders));
 router.get('/orders/stats', asyncHandler(adminController.orderStats));
 router.patch('/orders/:id/status', validate({ params: objectIdParam(), body: updateOrderStatusSchema }), asyncHandler(adminController.updateOrderStatus));
+router.get('/orders/:id/transactions', validate({ params: objectIdParam() }), asyncHandler(adminController.orderTransactions));
+router.post('/orders/:id/payments/refund', validate({ params: objectIdParam(), body: refundPaymentSchema }), asyncHandler(adminController.refundPayment));
 
 // ─── Customers ───────────────────────────────────────────────────────────────────
 router.get('/users', validate({ query: adminUsersQuerySchema }), asyncHandler(adminController.listUsers));
@@ -79,12 +82,14 @@ router.post('/upload', validate({ query: uploadQuerySchema }), uploadSingle('fil
 
 // ─── Coupons ───────────────────────────────────────────────────────────────────
 router.get('/coupons', validate({ query: adminCouponsQuerySchema }), asyncHandler(couponsController.list));
+router.get('/coupons/:id', validate({ params: objectIdParam() }), asyncHandler(couponsController.detail));
 router.post('/coupons', validate({ body: createCouponSchema }), asyncHandler(couponsController.create));
 router.patch('/coupons/:id', validate({ params: objectIdParam(), body: updateCouponSchema }), asyncHandler(couponsController.update));
 router.delete('/coupons/:id', validate({ params: objectIdParam() }), asyncHandler(couponsController.remove));
 
 // ─── Roles & Permissions ─────────────────────────────────────────────────────────
 router.get('/roles', asyncHandler(rolesController.list));
+router.get('/roles/:id', validate({ params: objectIdParam() }), asyncHandler(rolesController.detail));
 router.post('/roles', validate({ body: createRoleSchema }), asyncHandler(rolesController.create));
 router.patch('/roles/:id', validate({ params: objectIdParam(), body: updateRoleSchema }), asyncHandler(rolesController.update));
 router.delete('/roles/:id', validate({ params: objectIdParam() }), asyncHandler(rolesController.remove));
