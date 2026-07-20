@@ -9,6 +9,9 @@ export const rolesController = {
   async listPermissions(_req: Request, res: Response) {
     sendSuccess(res, await rolesService.listPermissions());
   },
+  async detail(req: Request, res: Response) {
+    sendSuccess(res, await rolesService.getById(req.params.id));
+  },
   async create(req: Request, res: Response) {
     sendCreated(res, await rolesService.create(req.body));
   },

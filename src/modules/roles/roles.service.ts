@@ -12,6 +12,12 @@ export const rolesService = {
     return permissionsRepository.findAll();
   },
 
+  async getById(id: string): Promise<IRole> {
+    const role = await rolesRepository.findById(id);
+    if (!role) throw ApiError.notFound('Role not found', ERROR_CODES.ROLE_NOT_FOUND);
+    return role;
+  },
+
   async create(data: Partial<IRole>): Promise<IRole> {
     if (data.name && (await rolesRepository.findByName(data.name))) {
       throw ApiError.conflict('Role name already exists', ERROR_CODES.ROLE_NAME_TAKEN);
