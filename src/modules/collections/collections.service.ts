@@ -13,6 +13,12 @@ export const collectionsService = {
     );
   },
 
+  async getById(id: string): Promise<ICollection> {
+    const collection = await collectionsRepository.findById(id);
+    if (!collection) throw ApiError.notFound('Collection not found', ERROR_CODES.COLLECTION_NOT_FOUND);
+    return collection;
+  },
+
   /** Products within a collection (curated order). */
   async products(collectionId: string): Promise<IProduct[]> {
     const collection = await collectionsRepository.findById(collectionId);

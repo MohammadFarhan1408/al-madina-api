@@ -12,4 +12,9 @@ export const collectionsController = {
     const products = await collectionsService.products(req.params.id);
     sendSuccess(res, products);
   },
+
+  async detail(req: Request, res: Response): Promise<void> {
+    const collection = await collectionsService.getById(req.params.id);
+    sendSuccess(res, collection);
+  },
 };

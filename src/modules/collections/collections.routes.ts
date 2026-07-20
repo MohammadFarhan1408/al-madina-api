@@ -7,6 +7,7 @@ import { asyncHandler } from '../../utils/async-handler';
 const router = Router();
 
 router.get('/', asyncHandler(collectionsController.list));
+router.get('/:id', validate({ params: objectIdParam() }), asyncHandler(collectionsController.detail));
 router.get(
   '/:id/products',
   validate({ params: objectIdParam() }),
