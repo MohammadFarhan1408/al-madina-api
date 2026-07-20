@@ -10,6 +10,11 @@ export const tagsRepository = {
     return Tag.findOne({ name }).exec();
   },
 
+  findById(id: string): Promise<ITag | null> {
+    if (!Types.ObjectId.isValid(id)) return Promise.resolve(null);
+    return Tag.findById(id).exec();
+  },
+
   exists(id: string): Promise<boolean> {
     if (!Types.ObjectId.isValid(id)) return Promise.resolve(false);
     return Tag.exists({ _id: id }).then((doc) => Boolean(doc));

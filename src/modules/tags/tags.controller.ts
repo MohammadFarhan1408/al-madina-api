@@ -6,6 +6,9 @@ export const tagsController = {
   async list(_req: Request, res: Response) {
     sendSuccess(res, await tagsService.list());
   },
+  async detail(req: Request, res: Response) {
+    sendSuccess(res, await tagsService.getById(req.params.id));
+  },
   async create(req: Request, res: Response) {
     sendCreated(res, await tagsService.create(req.body.name));
   },

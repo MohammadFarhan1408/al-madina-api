@@ -9,6 +9,12 @@ export const tagsService = {
     return tagsRepository.findAll();
   },
 
+  async getById(id: string): Promise<ITag> {
+    const tag = await tagsRepository.findById(id);
+    if (!tag) throw ApiError.notFound('Tag not found', ERROR_CODES.TAG_NOT_FOUND);
+    return tag;
+  },
+
   async create(name: string): Promise<ITag> {
     if (await tagsRepository.findByName(name)) {
       throw ApiError.conflict('Tag already exists', ERROR_CODES.TAG_NAME_TAKEN);
