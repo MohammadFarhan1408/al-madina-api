@@ -8,6 +8,12 @@ export const couponsService = {
     return couponsRepository.listAll(page, limit, isActive);
   },
 
+  async getById(id: string): Promise<ICoupon> {
+    const coupon = await couponsRepository.findById(id);
+    if (!coupon) throw ApiError.notFound('Coupon not found', ERROR_CODES.COUPON_NOT_FOUND);
+    return coupon;
+  },
+
   async create(data: Partial<ICoupon>): Promise<ICoupon> {
     if (data.code && (await couponsRepository.findByCode(data.code))) {
       throw ApiError.conflict('Coupon code already exists', ERROR_CODES.COUPON_CODE_TAKEN);

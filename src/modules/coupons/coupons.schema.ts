@@ -23,3 +23,11 @@ export const adminCouponsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
   isActive: z.enum(['true', 'false']).optional().transform((v) => (v === undefined ? undefined : v === 'true')),
 });
+
+/** POST /coupons/validate — public discount preview, also used by orders.service. */
+export const validateCouponSchema = z.object({
+  code: z.string().trim().min(3).max(24),
+  subtotal: z.coerce.number().min(0),
+});
+
+export type ValidateCouponInput = z.infer<typeof validateCouponSchema>;

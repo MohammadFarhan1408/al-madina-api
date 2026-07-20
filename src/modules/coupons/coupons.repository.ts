@@ -30,4 +30,12 @@ export const couponsRepository = {
   remove(id: string): Promise<ICoupon | null> {
     return Coupon.findByIdAndDelete(id).exec();
   },
+
+  incrementUsage(code: string): Promise<ICoupon | null> {
+    return Coupon.findOneAndUpdate(
+      { code: code.toUpperCase() },
+      { $inc: { usageCount: 1 } },
+      { new: true },
+    ).exec();
+  },
 };
