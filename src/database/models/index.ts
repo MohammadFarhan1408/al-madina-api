@@ -23,3 +23,4 @@ export { Role, type IRole } from './role.model';
 export { Permission, type IPermission } from './permission.model';
 export { Tag, type ITag } from './tag.model';
 export { Address, type IAddress } from './address.model';
+export { Transaction, type ITransaction } from './transaction.model';
