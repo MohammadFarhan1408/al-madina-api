@@ -15,6 +15,12 @@ export const categoriesService = {
     );
   },
 
+  async getById(id: string): Promise<ICategory> {
+    const category = await categoriesRepository.findById(id);
+    if (!category) throw ApiError.notFound('Category not found', ERROR_CODES.CATEGORY_NOT_FOUND);
+    return category;
+  },
+
   /** Products within a category (paginated). */
   async products(categoryId: string, query: PaginationQuery) {
     if (!(await categoriesRepository.exists(categoryId))) {

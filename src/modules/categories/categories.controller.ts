@@ -12,4 +12,9 @@ export const categoriesController = {
     const result = await categoriesService.products(req.params.id, req.query as never);
     sendSuccess(res, result);
   },
+
+  async detail(req: Request, res: Response): Promise<void> {
+    const category = await categoriesService.getById(req.params.id);
+    sendSuccess(res, category);
+  },
 };
