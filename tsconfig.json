@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "node16",
+    "moduleResolution": "node16",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -21,18 +21,17 @@
     "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
     "paths": {
-      "@config/*": ["src/config/*"],
-      "@constants/*": ["src/constants/*"],
-      "@middlewares/*": ["src/middlewares/*"],
-      "@modules/*": ["src/modules/*"],
-      "@utils/*": ["src/utils/*"],
-      "@types/*": ["src/types/*"],
-      "@jobs/*": ["src/jobs/*"],
-      "@emails/*": ["src/emails/*"],
-      "@storage/*": ["src/storage/*"],
-      "@providers/*": ["src/providers/*"]
+      "@config/*": ["./src/config/*"],
+      "@constants/*": ["./src/constants/*"],
+      "@middlewares/*": ["./src/middlewares/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@types/*": ["./src/types/*"],
+      "@jobs/*": ["./src/jobs/*"],
+      "@emails/*": ["./src/emails/*"],
+      "@storage/*": ["./src/storage/*"],
+      "@providers/*": ["./src/providers/*"]
     }
   },
   "include": ["src/**/*"],
