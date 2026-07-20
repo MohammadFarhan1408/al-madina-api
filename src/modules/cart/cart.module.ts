@@ -3,6 +3,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import { productsRepository } from '../products/products.repository';
+import { resolveLinePricing } from '../products/products.service';
 import { Cart, type ICart } from '../../database/models';
 import {
   FREE_SHIPPING_THRESHOLD,
@@ -44,12 +45,14 @@ async function reconcile(items: z.infer<typeof cartItemInput>[]) {
   const reconciled = items
     .map((line) => {
       const product = byId.get(line.productId);
-      if (!product || !product.inStock) return null;
+      if (!product) return null;
+      const { price, inStock } = resolveLinePricing(product, line.volumeMl);
+      if (!inStock) return null;
       return {
         productId: line.productId,
         quantity: line.quantity,
         volumeMl: line.volumeMl ?? product.volumeMl,
-        price: product.price,
+        price,
         name: product.name,
         image: product.images[0] ?? '',
       };
