@@ -20,6 +20,22 @@ const RAIL_FLAGS = {
 
 export type RailName = keyof typeof RAIL_FLAGS;
 
+/**
+ * Resolves the price/stock to charge/validate for a line item. Falls back to the
+ * product's top-level price/inStock when no `volumeMl` is given or no variant array
+ * exists (most products have none), so this is safe to call unconditionally.
+ */
+export function resolveLinePricing(
+  product: Pick<IProduct, 'price' | 'inStock' | 'variants'>,
+  volumeMl?: number,
+): { price: number; inStock: boolean } {
+  if (volumeMl && product.variants?.length) {
+    const variant = product.variants.find((v) => v.volumeMl === volumeMl);
+    if (variant) return { price: variant.price, inStock: variant.inStock };
+  }
+  return { price: product.price, inStock: product.inStock };
+}
+
 export const productsService = {
   /** GET /products — list or, if `ids` present, bulk fetch by id. */
   async list(query: ListProductsQuery): Promise<Paginated<IProduct> | IProduct[]> {
