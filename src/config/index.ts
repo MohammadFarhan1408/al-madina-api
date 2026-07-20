@@ -54,6 +54,11 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),
+
+  // HMAC secret verifying X-Webhook-Signature on POST /payments/callback.
+  // Stands in for a real gateway's webhook signing secret (see
+  // modules/payments/providers/index.ts for what a real gateway needs).
+  PAYMENT_WEBHOOK_SECRET: z.string().min(16).default('dev-payment-webhook-secret-change-me'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -121,6 +126,8 @@ export const config = {
 
   corsOrigins: env.CORS_ORIGINS,
   logLevel: env.LOG_LEVEL,
+
+  paymentWebhookSecret: env.PAYMENT_WEBHOOK_SECRET,
 } as const;
 
 export type AppConfig = typeof config;

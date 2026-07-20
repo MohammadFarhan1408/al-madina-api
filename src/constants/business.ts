@@ -101,3 +101,35 @@ export type ProductVariantSizeMl = (typeof PRODUCT_VARIANT_SIZES_ML)[number];
 /** Coupon discount types. */
 export const DISCOUNT_TYPES = ['percentage', 'fixed'] as const;
 export type DiscountType = (typeof DISCOUNT_TYPES)[number];
+
+/**
+ * Order-level payment status — independent of the fulfillment `status` axis.
+ * Denormalized from the order's latest transaction; written only by
+ * payments.service, never by the client.
+ */
+export const PAYMENT_STATUSES = [
+  'pending',
+  'processing',
+  'paid',
+  'failed',
+  'cancelled',
+  'refunded',
+] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+/** Payment providers backing a transaction. 'cod' is real; 'simulated' stands
+ * in for card/wallet until a real gateway is chosen (see payments/providers). */
+export const PAYMENT_PROVIDERS = ['cod', 'simulated'] as const;
+export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
+
+/** Per-attempt transaction status. An order can have multiple transactions
+ * (retries) — only one can reach 'succeeded'. */
+export const TRANSACTION_STATUSES = [
+  'pending',
+  'processing',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'refunded',
+] as const;
+export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];

@@ -4,10 +4,12 @@ import {
   ORDER_STATUSES,
   DELIVERY_METHODS,
   PAYMENT_METHODS,
+  PAYMENT_STATUSES,
   DEFAULT_CURRENCY,
   type OrderStatus,
   type DeliveryMethod,
   type PaymentMethod,
+  type PaymentStatus,
 } from '../../constants/business';
 
 /** Order line item — embedded as a sub-document with purchase-time snapshots. */
@@ -37,6 +39,7 @@ export interface IOrder extends Document {
   shippingAddress: IShippingAddress;
   deliveryMethod: DeliveryMethod;
   paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
   items: IOrderItem[];
   subtotal: number;
   shipping: number;
@@ -44,6 +47,7 @@ export interface IOrder extends Document {
   currency: string;
   couponCode?: string;
   discountAmount: number;
+  idempotencyKey?: string;
   placedAt: Date;
   deletedAt?: Date | null;
   createdAt: Date;
@@ -82,6 +86,7 @@ const orderSchema = new Schema<IOrder>(
     shippingAddress: { type: shippingAddressSchema, required: true },
     deliveryMethod: { type: String, enum: DELIVERY_METHODS, required: true },
     paymentMethod: { type: String, enum: PAYMENT_METHODS, required: true },
+    paymentStatus: { type: String, enum: PAYMENT_STATUSES, default: 'pending', index: true },
     items: { type: [orderItemSchema], required: true, validate: (v: unknown[]) => v.length > 0 },
     subtotal: { type: Number, required: true, min: 0 },
     shipping: { type: Number, required: true, min: 0 },
@@ -89,6 +94,7 @@ const orderSchema = new Schema<IOrder>(
     currency: { type: String, default: DEFAULT_CURRENCY, maxlength: 3 },
     couponCode: { type: String, uppercase: true, trim: true },
     discountAmount: { type: Number, default: 0, min: 0 },
+    idempotencyKey: { type: String, unique: true, sparse: true, index: true },
     placedAt: { type: Date, default: Date.now },
     deletedAt: { type: Date, default: null, index: true },
   },
