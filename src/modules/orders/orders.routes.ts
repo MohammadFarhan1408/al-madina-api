@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ordersController } from './orders.controller';
 import { createOrderSchema, listOrdersQuerySchema } from './orders.schema';
+import { retryPaymentSchema } from '../payments/payments.schema';
 import { objectIdParam } from '../../utils/common.schema';
 import { validate, requireAuth, authOptional } from '../../middlewares';
 import { ordersLimiter } from '../../middlewares/rate-limit.middleware';
@@ -25,6 +26,20 @@ router.get(
   authOptional,
   validate({ params: objectIdParam() }),
   asyncHandler(ordersController.getById),
+);
+
+router.get(
+  '/:id/payments',
+  authOptional,
+  validate({ params: objectIdParam() }),
+  asyncHandler(ordersController.listPayments),
+);
+
+router.post(
+  '/:id/payments/retry',
+  authOptional,
+  validate({ params: objectIdParam(), body: retryPaymentSchema }),
+  asyncHandler(ordersController.retryPayment),
 );
 
 export const ordersRoutes = router;

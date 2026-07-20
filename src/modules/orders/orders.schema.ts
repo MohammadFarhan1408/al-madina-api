@@ -10,7 +10,9 @@ import {
 const orderItemSchema = z.object({
   productId: z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid productId' }),
   quantity: z.coerce.number().int().min(1),
-  volumeMl: z.coerce.number().int().min(0),
+  // Optional — matches cartItemSchema (cart.module.ts). Not every checkout
+  // flow captures a size selection; falls back to the product's own volumeMl.
+  volumeMl: z.coerce.number().int().min(0).optional(),
 });
 
 const shippingAddressSchema = z.object({
@@ -27,6 +29,10 @@ export const createOrderSchema = z.object({
   deliveryMethod: z.enum(DELIVERY_METHODS),
   paymentMethod: z.enum(PAYMENT_METHODS),
   guestEmail: z.string().trim().toLowerCase().email().optional(),
+  couponCode: z.string().trim().toUpperCase().optional(),
+  // Client-generated, resent unchanged on retry — dedupes a double-submit
+  // into a single order instead of creating two.
+  idempotencyKey: z.string().uuid().optional(),
 });
 
 /** GET /orders query. */

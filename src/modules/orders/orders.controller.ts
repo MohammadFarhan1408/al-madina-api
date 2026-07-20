@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { ordersService } from './orders.service';
+import { paymentsService } from '../payments/payments.service';
 import { sendCreated, sendSuccess } from '../../utils/api-response';
 import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
@@ -9,6 +10,21 @@ export const ordersController = {
   async create(req: Request, res: Response): Promise<void> {
     const order = await ordersService.create(req.body, req.user);
     sendCreated(res, order);
+  },
+
+  /** GET /orders/:id/payments — owner or guest (reference+email), transaction attempt history. */
+  async listPayments(req: Request, res: Response): Promise<void> {
+    const guestEmail = typeof req.query.email === 'string' ? req.query.email : undefined;
+    await ordersService.getById(req.params.id, req.user, guestEmail); // ownership check, throws if unauthorized
+    sendSuccess(res, await paymentsService.listForOrder(req.params.id));
+  },
+
+  /** POST /orders/:id/payments/retry — owner or guest, only after the latest attempt failed/cancelled. */
+  async retryPayment(req: Request, res: Response): Promise<void> {
+    const guestEmail = typeof req.query.email === 'string' ? req.query.email : undefined;
+    await ordersService.getById(req.params.id, req.user, guestEmail); // ownership check, throws if unauthorized
+    const transaction = await paymentsService.retryPayment(req.params.id, req.body.idempotencyKey);
+    sendCreated(res, transaction);
   },
 
   /** GET /orders — authenticated history. */

@@ -2,7 +2,7 @@ import { Types, type FilterQuery } from 'mongoose';
 import { Order, type IOrder, type IOrderItem, type IShippingAddress } from '../../database/models';
 import { paginate } from '../../utils/paginate';
 import type { Paginated } from '../../types/api.types';
-import type { OrderStatus, DeliveryMethod, PaymentMethod } from '../../constants/business';
+import type { OrderStatus, DeliveryMethod, PaymentMethod, PaymentStatus } from '../../constants/business';
 
 export interface CreateOrderData {
   reference: string;
@@ -15,6 +15,9 @@ export interface CreateOrderData {
   subtotal: number;
   shipping: number;
   total: number;
+  couponCode?: string;
+  discountAmount?: number;
+  idempotencyKey?: string;
 }
 
 export const ordersRepository = {
@@ -38,6 +41,14 @@ export const ordersRepository = {
 
   findByReference(reference: string): Promise<IOrder | null> {
     return Order.findOne({ reference, deletedAt: null }).exec();
+  },
+
+  findByIdempotencyKey(idempotencyKey: string): Promise<IOrder | null> {
+    return Order.findOne({ idempotencyKey, deletedAt: null }).exec();
+  },
+
+  updatePaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<IOrder | null> {
+    return Order.findByIdAndUpdate(id, { $set: { paymentStatus } }, { new: true }).exec();
   },
 
   /** True if the user has a delivered order containing the given product. */
