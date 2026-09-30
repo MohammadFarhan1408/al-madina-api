@@ -1,5 +1,6 @@
 services:
   - type: web
+    runtime: node
     name: al-madina-api
     env: node
     plan: free
@@ -7,11 +8,74 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     envVars:
+      # Safe to set literally — not secret, and "production" is the only
+      # correct value for a deployed service (verified live at /health that
+      # this was set to "development", disabling rate limiting and leaking
+      # error detail — see docs/architecture.md / audit notes).
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: JWT_ACCESS_EXPIRY
+        value: 15m
+      - key: JWT_REFRESH_EXPIRY
+        value: 30d
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+
       - key: REDIS_URL
         fromService:
           type: keyvalue
           name: al-madina-redis
           property: connectionString
+
+      # Everything below is either a secret or environment-specific (a real
+      # domain, a real mailbox) — declared here so Render's dashboard requires
+      # them, but `sync: false` means this file will never push a value over
+      # whatever is already set. Set/verify each of these in the Render
+      # dashboard directly.
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: PAYMENT_WEBHOOK_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      # Must be the deployed storefront's own URL (scheme + host, no path) —
+      # used to build password-reset links. Confirmed live as
+      # https://al-madina.moffiitech.com as of 2026-09-30.
+      - key: CLIENT_URL
+        sync: false
+      # Comma-separated allowed origins. Must include the deployed storefront
+      # origin (https://al-madina.moffiitech.com, confirmed missing as of
+      # 2026-09-30 — this is why client-side fetches from the storefront were
+      # failing with no Access-Control-Allow-Origin header) plus the admin
+      # app's origin and any other first-party client origin.
+      - key: CORS_ORIGINS
+        sync: false
 
   - type: keyvalue
     name: al-madina-redis
