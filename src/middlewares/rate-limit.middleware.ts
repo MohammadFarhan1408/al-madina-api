@@ -1,5 +1,6 @@
 import rateLimit, { type Options } from "express-rate-limit";
 import type { Request } from "express";
+import { config } from "../config";
 import { ERROR_CODES } from "../constants/error-codes";
 import type { ApiErrorResponse } from "../types/api.types";
 
@@ -19,6 +20,8 @@ function createLimiter(options: Partial<Options> & { keyByUser?: boolean }) {
     standardHeaders: true,
     legacyHeaders: false,
     message: body,
+    // ponytail: limits are for real traffic, not local dev/tests.
+    skip: () => !config.isProd,
     ...(keyByUser
       ? { keyGenerator: (req: Request) => req.user?.id ?? req.ip ?? "unknown" }
       : {}),
