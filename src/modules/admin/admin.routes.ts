@@ -4,8 +4,6 @@ import { reviewsController } from '../reviews/reviews.controller';
 import { couponsController } from '../coupons/coupons.controller';
 import { createCouponSchema, updateCouponSchema, adminCouponsQuerySchema } from '../coupons/coupons.schema';
 import { refundPaymentSchema } from '../payments/payments.schema';
-import { rolesController } from '../roles/roles.controller';
-import { createRoleSchema, updateRoleSchema } from '../roles/roles.schema';
 import { tagsController } from '../tags/tags.controller';
 import { createTagSchema, updateTagSchema } from '../tags/tags.schema';
 import {
@@ -90,14 +88,6 @@ router.get('/coupons/:id', validate({ params: objectIdParam() }), asyncHandler(c
 router.post('/coupons', validate({ body: createCouponSchema }), asyncHandler(couponsController.create));
 router.patch('/coupons/:id', validate({ params: objectIdParam(), body: updateCouponSchema }), asyncHandler(couponsController.update));
 router.delete('/coupons/:id', validate({ params: objectIdParam() }), asyncHandler(couponsController.remove));
-
-// ─── Roles & Permissions ─────────────────────────────────────────────────────────
-router.get('/roles', asyncHandler(rolesController.list));
-router.get('/roles/:id', validate({ params: objectIdParam() }), asyncHandler(rolesController.detail));
-router.post('/roles', validate({ body: createRoleSchema }), asyncHandler(rolesController.create));
-router.patch('/roles/:id', validate({ params: objectIdParam(), body: updateRoleSchema }), asyncHandler(rolesController.update));
-router.delete('/roles/:id', validate({ params: objectIdParam() }), asyncHandler(rolesController.remove));
-router.get('/permissions', asyncHandler(rolesController.listPermissions));
 
 // ─── Tags ──────────────────────────────────────────────────────────────────────
 router.post('/tags', validate({ body: createTagSchema }), asyncHandler(tagsController.create));
