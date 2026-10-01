@@ -10,7 +10,7 @@ import { ordersService } from '../orders/orders.service';
 import { paymentsService } from '../payments/payments.service';
 import { notificationsRepository } from '../notifications/notifications.repository';
 import { addressesRepository } from '../addresses/addresses.repository';
-import { User, Cart } from '../../database/models';
+import { User, Cart, UserPreference } from '../../database/models';
 import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { uploadToCloudinary, type UploadType } from '../../storage/upload';
@@ -198,7 +198,21 @@ export const adminService = {
   async broadcast(input: { kind: NotificationKind; title: string; body: string; tier?: UserTier }) {
     const filter: Record<string, unknown> = { isActive: true };
     if (input.tier) filter.tier = input.tier;
-    const users = await User.find(filter).select('_id').lean<{ _id: Types.ObjectId }[]>().exec();
+    let users = await User.find(filter).select('_id').lean<{ _id: Types.ObjectId }[]>().exec();
+
+    // A 'promo' broadcast respects promosEnabled; other kinds (order/system/
+    // wishlist) aren't promotional and always reach everyone matched above.
+    if (input.kind === 'promo' && users.length > 0) {
+      const optedOut = await UserPreference.find({
+        userId: { $in: users.map((u) => u._id) },
+        promosEnabled: false,
+      })
+        .select('userId')
+        .lean<{ userId: Types.ObjectId }[]>()
+        .exec();
+      const optedOutIds = new Set(optedOut.map((p) => p.userId.toString()));
+      users = users.filter((u) => !optedOutIds.has(u._id.toString()));
+    }
 
     const docs = users.map((u) => ({
       userId: u._id,
