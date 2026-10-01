@@ -93,7 +93,7 @@ const productSchema = new Schema<IProduct>(
     isSeasonal: { type: Boolean, default: false },
     variants: { type: [productVariantSchema], default: [] },
     tagIds: { type: [Schema.Types.ObjectId], ref: 'Tag', default: [] },
-    slug: { type: String, unique: true, sparse: true, trim: true, index: true },
+    slug: { type: String, unique: true, sparse: true, trim: true },
     metaTitle: { type: String, trim: true },
     metaDescription: { type: String, trim: true },
     metaKeywords: { type: [String], default: undefined },

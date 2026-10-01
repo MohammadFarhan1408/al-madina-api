@@ -44,4 +44,7 @@ reviewSchema.index(
   { unique: true, partialFilterExpression: { userId: { $type: 'objectId' }, deletedAt: null } },
 );
 
+// Product page lists reviews newest-first.
+reviewSchema.index({ productId: 1, date: -1 });
+
 export const Review = model<IReview>('Review', reviewSchema);

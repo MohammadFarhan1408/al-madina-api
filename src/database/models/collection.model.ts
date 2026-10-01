@@ -34,7 +34,7 @@ const collectionSchema = new Schema<ICollection>(
     productIds: [{ type: Schema.Types.ObjectId, ref: 'Product', index: true }],
     productCount: { type: Number, default: 0, min: 0 },
     sortOrder: { type: Number, default: 0, index: true },
-    slug: { type: String, unique: true, sparse: true, trim: true, index: true },
+    slug: { type: String, unique: true, sparse: true, trim: true },
     metaTitle: { type: String, trim: true },
     metaDescription: { type: String, trim: true },
     metaKeywords: { type: [String], default: undefined },
