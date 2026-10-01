@@ -14,16 +14,21 @@ import { config } from '../../config';
  * instead — see modules/payments/providers/index.ts. */
 function verifyWebhookSignature(req: Request, _res: Response, next: NextFunction): void {
   const signature = req.header('X-Webhook-Signature');
-  if (!signature) {
+  if (!signature || !Buffer.isBuffer(req.body)) {
     throw ApiError.unauthorized('Missing webhook signature', ERROR_CODES.INVALID_WEBHOOK_SIGNATURE);
   }
-  const expected = createHmac('sha256', config.paymentWebhookSecret)
-    .update(JSON.stringify(req.body))
-    .digest('hex');
+  // Sign-check the exact bytes received (app.ts mounts express.raw here), never
+  // a re-serialisation of a parsed body.
+  const expected = createHmac('sha256', config.paymentWebhookSecret).update(req.body).digest('hex');
   const provided = Buffer.from(signature);
   const wanted = Buffer.from(expected);
   if (provided.length !== wanted.length || !timingSafeEqual(provided, wanted)) {
     throw ApiError.unauthorized('Invalid webhook signature', ERROR_CODES.INVALID_WEBHOOK_SIGNATURE);
+  }
+  try {
+    req.body = JSON.parse(req.body.toString('utf8'));
+  } catch {
+    throw ApiError.badRequest('Malformed JSON body', ERROR_CODES.VALIDATION_ERROR);
   }
   next();
 }
@@ -34,9 +39,12 @@ const router = Router();
 // trust comes from the signature instead of a session.
 router.post(
   '/callback',
-  validate({ body: simulateCallbackSchema }),
   verifyWebhookSignature,
+  validate({ body: simulateCallbackSchema }),
   asyncHandler(paymentsController.callback),
 );
+
+// Stripe verifies its own signature in the controller, over the raw bytes.
+router.post('/stripe/webhook', asyncHandler(paymentsController.stripeWebhook));
 
 export const paymentsRoutes = router;

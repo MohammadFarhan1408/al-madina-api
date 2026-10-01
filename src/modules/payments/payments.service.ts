@@ -2,10 +2,12 @@ import { paymentsRepository } from './payments.repository';
 import { ordersRepository } from '../orders/orders.repository';
 import { couponsRepository } from '../coupons/coupons.repository';
 import { paymentProviders, providerForMethod } from './providers';
+import { config } from '../../config';
 import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { queueNotification } from '../../jobs/queues/notification.queue';
 import type { IOrder, ITransaction } from '../../database/models';
+import type Stripe from 'stripe';
 import type { PaymentStatus, TransactionStatus } from '../../constants/business';
 
 /** Maps a transaction's per-attempt status to the order-level paymentStatus. */
@@ -22,6 +24,12 @@ async function settleOrderPaid(order: IOrder): Promise<void> {
   }
 }
 
+/** Hosted gateways send the customer back here; guests need ?email= to view. */
+function returnUrlFor(order: IOrder): string {
+  const q = order.guestEmail ? `?email=${encodeURIComponent(order.guestEmail)}` : '';
+  return `${config.clientUrl}/order/${order._id}${q}`;
+}
+
 export const paymentsService = {
   /** Creates the first transaction for a freshly-created order. Idempotent on
    * `idempotencyKey` — a retried request with the same key returns the
@@ -36,6 +44,8 @@ export const paymentsService = {
       amount: order.total,
       currency: order.currency,
       idempotencyKey,
+      reference: order.reference,
+      returnUrl: returnUrlFor(order),
     });
 
     const transaction = await paymentsRepository.create({
@@ -76,6 +86,8 @@ export const paymentsService = {
       amount: order.total,
       currency: order.currency,
       idempotencyKey,
+      reference: order.reference,
+      returnUrl: returnUrlFor(order),
     });
 
     const transaction = await paymentsRepository.create({
@@ -93,10 +105,10 @@ export const paymentsService = {
     return transaction;
   },
 
-  /** POST /payments/callback — the simulated gateway's webhook stand-in.
-   * Rejects replays against an already-settled transaction, which is also
-   * what keeps coupon usageCount from double-incrementing. */
-  async handleSimulatedCallback(
+  /** Settles a transaction from a gateway event (simulated callback or Stripe
+   * webhook). Rejects replays against an already-settled transaction, which is
+   * also what keeps coupon usageCount from double-incrementing. */
+  async settleFromGateway(
     transactionId: string,
     status: 'succeeded' | 'failed',
     providerReference?: string,
@@ -132,6 +144,29 @@ export const paymentsService = {
       }
     }
     return updated;
+  },
+
+  /** Stripe webhook events. Unknown/irrelevant events and replays are
+   * acknowledged silently so Stripe doesn't retry them forever. */
+  async handleStripeEvent(event: Stripe.Event): Promise<void> {
+    if (!event.type.startsWith('checkout.session.')) return;
+    const session = event.data.object as Stripe.Checkout.Session;
+    let status: 'succeeded' | 'failed' | undefined;
+    if (event.type === 'checkout.session.async_payment_succeeded') status = 'succeeded';
+    else if (event.type === 'checkout.session.completed' && session.payment_status === 'paid') status = 'succeeded';
+    else if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
+      status = 'failed';
+    }
+    if (!status) return;
+
+    const transaction = await paymentsRepository.findByProviderReference(session.id);
+    if (!transaction) return;
+    try {
+      await this.settleFromGateway(transaction._id.toString(), status, session.id);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === ERROR_CODES.PAYMENT_ALREADY_SETTLED) return;
+      throw err;
+    }
   },
 
   /** Called from orders.service.updateStatus when an admin marks a COD order

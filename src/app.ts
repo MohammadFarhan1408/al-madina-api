@@ -35,6 +35,9 @@ export function createApp(): Application {
     }),
   );
   app.use(compression());
+  // Webhooks are signed over the exact bytes sent, so they get the raw body
+  // (parsed later, after verification) — this must run before express.json.
+  app.use(['/v1/payments/callback', '/v1/payments/stripe/webhook'], express.raw({ type: 'application/json', limit: '1mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());

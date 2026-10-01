@@ -6,6 +6,10 @@ export interface InitiatePaymentInput {
   amount: number;
   currency: string;
   idempotencyKey: string;
+  /** Order reference (AM-#####), shown on hosted gateway pages. */
+  reference: string;
+  /** Where a hosted gateway sends the customer back to. */
+  returnUrl: string;
 }
 
 export interface ProviderResult {
