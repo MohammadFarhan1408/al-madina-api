@@ -9,6 +9,7 @@ import { notificationsRoutes } from '../modules/notifications/notifications.rout
 import { usersRoutes } from '../modules/users/users.routes';
 import { searchRoutes } from '../modules/search/search.routes';
 import { contactRoutes } from '../modules/contact/contact.module';
+import { newsletterRoutes } from '../modules/newsletter/newsletter.module';
 import { cartRoutes } from '../modules/cart/cart.module';
 import { tagsRoutes } from '../modules/tags/tags.routes';
 import { addressesRoutes } from '../modules/addresses/addresses.routes';
@@ -31,6 +32,7 @@ router.use('/notifications', notificationsRoutes);
 router.use('/users', usersRoutes);
 router.use('/search', searchRoutes);
 router.use('/contact', contactRoutes);
+router.use('/newsletter', newsletterRoutes);
 router.use('/cart', cartRoutes);
 router.use('/tags', tagsRoutes);
 router.use('/addresses', addressesRoutes);
