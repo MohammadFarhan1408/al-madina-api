@@ -63,6 +63,15 @@ export const authRepository = {
     ).exec();
   },
 
+  /** Revoke every live refresh token for a user — used on password reset so a
+   * token stolen before the reset doesn't outlive it. */
+  async revokeAllRefreshTokensForUser(userId: Types.ObjectId): Promise<void> {
+    await RefreshToken.updateMany(
+      { userId, revokedAt: null },
+      { $set: { revokedAt: new Date() } },
+    ).exec();
+  },
+
   // ─── Password reset tokens ─────────────────────────────────────────────────
 
   createPasswordResetToken(userId: Types.ObjectId, tokenHash: string, expiresAt: Date) {
