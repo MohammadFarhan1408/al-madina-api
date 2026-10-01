@@ -220,6 +220,11 @@ export const adminService = {
     return uploadToCloudinary(file, type);
   },
 
+  // ─── Contact submissions ─────────────────────────────────────────────────────
+  listContactSubmissions(page: number, limit: number) {
+    return adminRepository.listContactSubmissions(page, limit);
+  },
+
   // ─── Dashboard ───────────────────────────────────────────────────────────────
   async dashboard() {
     const dayMs = 24 * 60 * 60 * 1000;

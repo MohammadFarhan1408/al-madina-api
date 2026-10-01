@@ -24,6 +24,7 @@ import {
   notificationHistoryQuerySchema,
   adminReviewsQuerySchema,
   uploadQuerySchema,
+  adminContactQuerySchema,
 } from './admin.schema';
 import { objectIdParam } from '../../utils/common.schema';
 import { validate, requireAuth, requireRole, auditLog } from '../../middlewares';
@@ -79,6 +80,9 @@ router.delete('/reviews/:id', validate({ params: objectIdParam() }), asyncHandle
 
 // ─── Upload ────────────────────────────────────────────────────────────────────
 router.post('/upload', validate({ query: uploadQuerySchema }), uploadSingle('file'), asyncHandler(adminController.upload));
+
+// ─── Contact submissions ─────────────────────────────────────────────────────────
+router.get('/contact', validate({ query: adminContactQuerySchema }), asyncHandler(adminController.listContactSubmissions));
 
 // ─── Coupons ───────────────────────────────────────────────────────────────────
 router.get('/coupons', validate({ query: adminCouponsQuerySchema }), asyncHandler(couponsController.list));

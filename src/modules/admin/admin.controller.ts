@@ -113,4 +113,10 @@ export const adminController = {
   async dashboard(_req: Request, res: Response) {
     sendSuccess(res, await adminService.dashboard());
   },
+
+  // Contact submissions
+  async listContactSubmissions(req: Request, res: Response) {
+    const { page, limit } = req.query as never as { page: number; limit: number };
+    sendSuccess(res, await adminService.listContactSubmissions(page, limit));
+  },
 };

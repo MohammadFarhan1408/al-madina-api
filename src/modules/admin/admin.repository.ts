@@ -1,5 +1,12 @@
 import { Types } from 'mongoose';
-import { User, Order, AuditLog, type IUser } from '../../database/models';
+import {
+  User,
+  Order,
+  AuditLog,
+  ContactSubmission,
+  type IUser,
+  type IContactSubmission,
+} from '../../database/models';
 import { paginate } from '../../utils/paginate';
 import type { Paginated } from '../../types/api.types';
 import type { UserTier, NotificationKind } from '../../constants/business';
@@ -77,6 +84,11 @@ export const adminRepository = {
         createdAt: log.createdAt,
       })),
     };
+  },
+
+  // ─── Contact submissions ─────────────────────────────────────────────────────
+  listContactSubmissions(page: number, limit: number): Promise<Paginated<IContactSubmission>> {
+    return paginate<IContactSubmission>(ContactSubmission, {}, { page, limit, sort: { createdAt: -1 } });
   },
 
   // ─── Dashboard aggregations ──────────────────────────────────────────────────

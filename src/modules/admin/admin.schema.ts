@@ -141,3 +141,9 @@ export const adminReviewsQuerySchema = z.object({
 export const uploadQuerySchema = z.object({
   type: z.enum(['product', 'avatar', 'category', 'collection']).default('product'),
 });
+
+// ─── Contact submissions ─────────────────────────────────────────────────────────
+export const adminContactQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
+  limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
+});
