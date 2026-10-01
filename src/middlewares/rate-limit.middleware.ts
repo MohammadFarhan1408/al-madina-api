@@ -58,3 +58,7 @@ export const contactLimiter = createLimiter({
   windowMs: 60 * 60 * 1000,
   limit: 3,
 });
+export const newsletterLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+});

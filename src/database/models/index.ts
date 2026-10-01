@@ -16,6 +16,7 @@ export {
 } from './order.model';
 export { Notification, type INotification } from './notification.model';
 export { ContactSubmission, type IContactSubmission } from './contact-submission.model';
+export { NewsletterSubscriber, type INewsletterSubscriber } from './newsletter-subscriber.model';
 export { AuditLog, type IAuditLog } from './audit-log.model';
 export { Coupon, type ICoupon } from './coupon.model';
 export { Cart, type ICart, type ICartItem } from './cart.model';
