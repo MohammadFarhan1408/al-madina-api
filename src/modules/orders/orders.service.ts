@@ -1,4 +1,5 @@
 import { ordersRepository } from './orders.repository';
+import { authRepository } from '../auth/auth.repository';
 import { productsRepository } from '../products/products.repository';
 import { resolveLinePricing } from '../products/products.service';
 import { couponsService } from '../coupons/coupons.service';
@@ -187,10 +188,15 @@ export const ordersService = {
       order = (await ordersRepository.findById(id)) ?? order;
     }
 
-    // Notify the order owner of the status change.
-    const recipientEmail = order.guestEmail;
-    if (status === 'shipped' && recipientEmail) {
-      void queueEmail({ type: 'shipping-update', to: recipientEmail, reference: order.reference, status });
+    // Notify the order owner of the status change. Guests are reachable only
+    // by their stored email; registered users have no email on the order
+    // itself (by design — see ordersService.create), so look theirs up.
+    if (status === 'shipped') {
+      const recipientEmail =
+        order.guestEmail ?? (order.userId ? (await authRepository.findById(order.userId.toString()))?.email : undefined);
+      if (recipientEmail) {
+        void queueEmail({ type: 'shipping-update', to: recipientEmail, reference: order.reference, status });
+      }
     }
     if (order.userId) {
       void queueNotification({
