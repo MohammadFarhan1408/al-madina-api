@@ -12,6 +12,15 @@ export const reviewsRepository = {
     );
   },
 
+  /** True if this user already has a live (non-deleted) review on this product. */
+  existsForUser(productId: string, userId: string): Promise<boolean> {
+    return Review.exists({
+      productId: new Types.ObjectId(productId),
+      userId: new Types.ObjectId(userId),
+      deletedAt: null,
+    }).then((doc) => Boolean(doc));
+  },
+
   create(data: {
     productId: string;
     userId?: string | null;

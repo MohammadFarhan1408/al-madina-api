@@ -34,4 +34,14 @@ const reviewSchema = new Schema<IReview>(
   baseSchemaOptions,
 );
 
+// Prevents one account from leaving more than one live review on a product
+// (which would otherwise let a single user move its rating arbitrarily).
+// Partial so it only constrains real, non-deleted reviews — a soft-deleted
+// review doesn't block a new one, and reviews preserved with userId: null
+// after an account is removed never collide with each other.
+reviewSchema.index(
+  { productId: 1, userId: 1 },
+  { unique: true, partialFilterExpression: { userId: { $type: 'objectId' }, deletedAt: null } },
+);
+
 export const Review = model<IReview>('Review', reviewSchema);
