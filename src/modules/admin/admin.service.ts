@@ -29,6 +29,7 @@ export const adminService = {
     if (!data.slug && data.name) data.slug = slugify(data.name);
     const product = await productsRepository.create(data);
     await productsService.invalidateAll();
+    await categoriesService.invalidateCache(); // category product counts
     return product;
   },
 
@@ -36,6 +37,7 @@ export const adminService = {
     const product = await productsRepository.update(id, data);
     if (!product) throw ApiError.notFound('Product not found', ERROR_CODES.PRODUCT_NOT_FOUND);
     await productsService.invalidateProduct(id);
+    if (data.categoryId) await categoriesService.invalidateCache();
     // Back-in-stock alert for anyone who wishlisted this product (§15).
     if (data.inStock === true) {
       void queuePush({ type: 'back-in-stock', productId: id, productName: product.name });
@@ -47,6 +49,7 @@ export const adminService = {
     const product = await productsRepository.softDelete(id);
     if (!product) throw ApiError.notFound('Product not found', ERROR_CODES.PRODUCT_NOT_FOUND);
     await productsService.invalidateAll();
+    await categoriesService.invalidateCache();
   },
 
   async addProductImages(id: string, files: Express.Multer.File[]): Promise<IProduct> {

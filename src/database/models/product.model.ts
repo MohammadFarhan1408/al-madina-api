@@ -59,7 +59,7 @@ const productVariantSchema = new Schema<IProductVariant>(
     // Not `unique: true` — that builds a single collection-wide index on
     // `variants.sku` that collides once two products both have an empty
     // `variants` array (both index as null). SKU uniqueness within a
-    // product's own variants is enforced at the application layer instead.
+    // product's own variants is enforced by the admin zod schema instead.
     sku: { type: String, required: true, trim: true, uppercase: true },
     barcode: { type: String, trim: true },
     stock: { type: Number, required: true, min: 0, default: 0 },

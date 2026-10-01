@@ -38,7 +38,12 @@ export const collectionsRepository = {
   },
 
   update(id: string, data: Partial<ICollection>): Promise<ICollection | null> {
-    return Collection.findByIdAndUpdate(id, { $set: data }, { new: true }).exec();
+    return Collection.findByIdAndUpdate(
+      id,
+      // findByIdAndUpdate skips the pre('save') hook that derives productCount.
+      { $set: data.productIds ? { ...data, productCount: data.productIds.length } : data },
+      { new: true },
+    ).exec();
   },
 
   remove(id: string): Promise<ICollection | null> {

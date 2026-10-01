@@ -51,7 +51,13 @@ export const createProductSchema = z.object({
   isBestSeller: z.boolean().optional(),
   isSignature: z.boolean().optional(),
   isSeasonal: z.boolean().optional(),
-  variants: z.array(productVariantSchema).default([]),
+  variants: z
+    .array(productVariantSchema)
+    .refine((v) => new Set(v.map((x) => x.sku)).size === v.length, { message: 'Variant SKUs must be unique' })
+    .refine((v) => new Set(v.map((x) => x.volumeMl)).size === v.length, {
+      message: 'Variant sizes must be unique',
+    })
+    .default([]),
   tagIds: z.array(objectId).default([]),
   ...seoFields,
 });
