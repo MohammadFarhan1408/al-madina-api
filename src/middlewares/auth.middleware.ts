@@ -67,8 +67,3 @@ export function requireRole(...roles: UserRole[]): RequestHandler {
     throw ApiError.forbidden('Insufficient permissions', ERROR_CODES.FORBIDDEN);
   };
 }
-
-/** Shorthand: require admin role. */
-export const requireAdmin: RequestHandler = (req, res, next) => {
-  requireRole('admin')(req, res, next);
-};

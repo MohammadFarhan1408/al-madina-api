@@ -1,4 +1,4 @@
-export { requireAuth, authOptional, requireRole, requireAdmin } from './auth.middleware';
+export { requireAuth, authOptional, requireRole } from './auth.middleware';
 export { validate, type ValidationSchemas } from './validate.middleware';
 export { errorHandler, notFoundHandler } from './error.middleware';
 export { auditLog } from './audit.middleware';

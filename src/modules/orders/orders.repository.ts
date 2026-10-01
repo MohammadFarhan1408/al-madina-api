@@ -39,10 +39,6 @@ export const ordersRepository = {
     return Order.findOne({ _id: id, deletedAt: null }).exec();
   },
 
-  findByReference(reference: string): Promise<IOrder | null> {
-    return Order.findOne({ reference, deletedAt: null }).exec();
-  },
-
   findByIdempotencyKey(idempotencyKey: string): Promise<IOrder | null> {
     return Order.findOne({ idempotencyKey, deletedAt: null }).exec();
   },
