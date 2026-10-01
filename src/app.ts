@@ -47,19 +47,16 @@ export function createApp(): Application {
 
   // ─── Health check ────────────────────────────────────────────────────────
   app.get('/health', (_req: Request, res: Response) => {
-    sendSuccess(res, {
-      status: 'ok',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-      env: config.env,
-    });
+    sendSuccess(res, { status: 'ok' });
   });
 
   // ─── API documentation ────────────────────────────────────────────────────
-  app.get('/docs.json', (_req: Request, res: Response) => {
-    res.json(openApiSpec);
-  });
-  app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, { customSiteTitle: 'Al Madina API' }));
+  if (config.isDev) {
+    app.get('/docs.json', (_req: Request, res: Response) => {
+      res.json(openApiSpec);
+    });
+    app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, { customSiteTitle: 'Al Madina API' }));
+  }
 
   // ─── API routes ──────────────────────────────────────────────────────────
   app.use('/v1', globalLimiter, apiRouter);
