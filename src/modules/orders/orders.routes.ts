@@ -4,7 +4,7 @@ import { createOrderSchema, listOrdersQuerySchema } from './orders.schema';
 import { retryPaymentSchema } from '../payments/payments.schema';
 import { objectIdParam } from '../../utils/common.schema';
 import { validate, requireAuth, authOptional } from '../../middlewares';
-import { ordersLimiter } from '../../middlewares/rate-limit.middleware';
+import { ordersLimiter, orderLookupLimiter } from '../../middlewares/rate-limit.middleware';
 import { asyncHandler } from '../../utils/async-handler';
 
 const router = Router();
@@ -24,6 +24,7 @@ router.get('/', requireAuth, validate({ query: listOrdersQuerySchema }), asyncHa
 router.get(
   '/:id',
   authOptional,
+  orderLookupLimiter,
   validate({ params: objectIdParam() }),
   asyncHandler(ordersController.getById),
 );
@@ -31,6 +32,7 @@ router.get(
 router.get(
   '/:id/payments',
   authOptional,
+  orderLookupLimiter,
   validate({ params: objectIdParam() }),
   asyncHandler(ordersController.listPayments),
 );

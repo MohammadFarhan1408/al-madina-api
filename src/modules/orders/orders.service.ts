@@ -159,7 +159,7 @@ export const ordersService = {
     const isGuestMatch =
       !order.userId && guestEmail && order.guestEmail === guestEmail.toLowerCase();
 
-    if (!isOwner && !isGuestMatch && user?.role !== 'admin') {
+    if (!isOwner && !isGuestMatch && user?.role !== 'admin' && user?.role !== 'manager') {
       throw ApiError.forbidden('You do not have access to this order', ERROR_CODES.FORBIDDEN);
     }
     return order;
