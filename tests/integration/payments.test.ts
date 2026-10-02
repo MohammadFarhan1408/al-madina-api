@@ -1,15 +1,14 @@
 import request from 'supertest';
 import { createHmac } from 'node:crypto';
 import { app, seedProduct, createUserAndSignIn, makeAdmin, bearer } from '../helpers';
-import { Coupon, Product } from '../../src/database/models';
+import Stripe from 'stripe';
+import { Coupon, Product, Transaction } from '../../src/database/models';
 
 const address = { fullName: 'Test Buyer', phone: '0501234567', address: '123 Marina Street', city: 'Dubai' };
 const WEBHOOK_SECRET = 'dev-payment-webhook-secret-change-me'; // config default when PAYMENT_WEBHOOK_SECRET is unset (see tests/setup.ts)
 
 function signCallback(body: { transactionId: string; status: string; providerReference?: string }) {
-  // Key order must match simulateCallbackSchema's shape (zod builds the
-  // output object in schema-declaration order), since the route signs the
-  // already-validated req.body.
+  // The route verifies the raw bytes received, which supertest sends as JSON.stringify(body).
   const ordered: Record<string, unknown> = { transactionId: body.transactionId, status: body.status };
   if (body.providerReference !== undefined) ordered.providerReference = body.providerReference;
   const signature = createHmac('sha256', WEBHOOK_SECRET).update(JSON.stringify(ordered)).digest('hex');
@@ -265,5 +264,52 @@ describe('Payments', () => {
 
     const finalOrder = await request(app).get(`/v1/orders/${order.body.data.id}`).set(auth);
     expect(finalOrder.body.data.paymentStatus).toBe('refunded');
+  });
+
+  describe('Stripe webhook', () => {
+    const stripeSecret = 'whsec_test_secret';
+    const send = (payload: object, secret = stripeSecret) => {
+      const raw = JSON.stringify(payload);
+      const header = new Stripe('sk_test_x').webhooks.generateTestHeaderString({ payload: raw, secret });
+      return request(app)
+        .post('/v1/payments/stripe/webhook')
+        .set('Content-Type', 'application/json')
+        .set('Stripe-Signature', header)
+        .send(raw);
+    };
+    const completed = (id: string) => ({
+      id: 'evt_1',
+      object: 'event',
+      type: 'checkout.session.completed',
+      data: { object: { id, object: 'checkout.session', payment_status: 'paid' } },
+    });
+
+    async function orderWithSession(sessionId: string) {
+      const { res } = await placeOrder();
+      await Transaction.updateOne({ orderId: res.body.data.id }, { providerReference: sessionId });
+      return res.body.data;
+    }
+
+    it('settles the order paid on a correctly signed event, and tolerates replays', async () => {
+      const order = await orderWithSession('cs_test_1');
+      expect((await send(completed('cs_test_1'))).status).toBe(200);
+      const after = await request(app).get(`/v1/orders/${order.id}?email=${order.guestEmail}`);
+      expect(after.body.data.paymentStatus).toBe('paid');
+      expect((await send(completed('cs_test_1'))).status).toBe(200); // replay: acknowledged, no 409
+    });
+
+    it('rejects a bad signature and changes nothing', async () => {
+      const order = await orderWithSession('cs_test_2');
+      expect((await send(completed('cs_test_2'), 'whsec_wrong')).status).toBe(401);
+      const after = await request(app).get(`/v1/orders/${order.id}?email=${order.guestEmail}`);
+      expect(after.body.data.paymentStatus).toBe('processing');
+    });
+
+    it('fails the transaction when the checkout session expires', async () => {
+      const order = await orderWithSession('cs_test_3');
+      await send({ ...completed('cs_test_3'), type: 'checkout.session.expired' });
+      const after = await request(app).get(`/v1/orders/${order.id}?email=${order.guestEmail}`);
+      expect(after.body.data.paymentStatus).toBe('failed');
+    });
   });
 });

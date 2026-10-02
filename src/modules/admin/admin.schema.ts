@@ -51,7 +51,13 @@ export const createProductSchema = z.object({
   isBestSeller: z.boolean().optional(),
   isSignature: z.boolean().optional(),
   isSeasonal: z.boolean().optional(),
-  variants: z.array(productVariantSchema).default([]),
+  variants: z
+    .array(productVariantSchema)
+    .refine((v) => new Set(v.map((x) => x.sku)).size === v.length, { message: 'Variant SKUs must be unique' })
+    .refine((v) => new Set(v.map((x) => x.volumeMl)).size === v.length, {
+      message: 'Variant sizes must be unique',
+    })
+    .default([]),
   tagIds: z.array(objectId).default([]),
   ...seoFields,
 });
@@ -140,4 +146,10 @@ export const adminReviewsQuerySchema = z.object({
 // ─── Upload ────────────────────────────────────────────────────────────────────
 export const uploadQuerySchema = z.object({
   type: z.enum(['product', 'avatar', 'category', 'collection']).default('product'),
+});
+
+// ─── Contact submissions ─────────────────────────────────────────────────────────
+export const adminContactQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
+  limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
 });

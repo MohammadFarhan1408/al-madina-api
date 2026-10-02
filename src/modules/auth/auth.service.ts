@@ -169,5 +169,7 @@ export const authService = {
     await authRepository.updatePassword(record.userId, passwordHash);
     // Single-use: remove all reset tokens for this user.
     await authRepository.deletePasswordResetTokensForUser(record.userId);
+    // A refresh token stolen before the reset must not outlive it.
+    await authRepository.revokeAllRefreshTokensForUser(record.userId);
   },
 };

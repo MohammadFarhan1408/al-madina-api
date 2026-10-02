@@ -13,6 +13,7 @@ const router = Router();
 router.use(requireAuth); // All /users/me routes are protected.
 
 router.patch('/me', validate({ body: updateProfileSchema }), asyncHandler(usersController.updateProfile));
+router.get('/me/preferences', asyncHandler(usersController.getPreferences));
 router.patch(
   '/me/preferences',
   validate({ body: updatePreferencesSchema }),

@@ -80,7 +80,7 @@ const orderSchema = new Schema<IOrder>(
   {
     reference: { type: String, required: true, unique: true, index: true },
     // Nullable: guest orders preserved (SET NULL) if a user is removed (§11).
-    userId: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     guestEmail: { type: String, lowercase: true, trim: true },
     status: { type: String, enum: ORDER_STATUSES, default: 'processing', index: true },
     shippingAddress: { type: shippingAddressSchema, required: true },
@@ -100,5 +100,8 @@ const orderSchema = new Schema<IOrder>(
   },
   baseSchemaOptions,
 );
+
+// Covers "my orders" (filter by user, newest first); supersedes a bare userId index.
+orderSchema.index({ userId: 1, placedAt: -1 });
 
 export const Order = model<IOrder>('Order', orderSchema);

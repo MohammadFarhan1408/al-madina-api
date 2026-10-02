@@ -59,6 +59,11 @@ const envSchema = z.object({
   // Stands in for a real gateway's webhook signing secret (see
   // modules/payments/providers/index.ts for what a real gateway needs).
   PAYMENT_WEBHOOK_SECRET: z.string().min(16).default('dev-payment-webhook-secret-change-me'),
+
+  // Stripe (test-mode keys work). Unset => card/wallet fall back to the
+  // simulated provider, so local dev needs no Stripe account.
+  STRIPE_SECRET_KEY: z.string().optional().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -128,6 +133,11 @@ export const config = {
   logLevel: env.LOG_LEVEL,
 
   paymentWebhookSecret: env.PAYMENT_WEBHOOK_SECRET,
+  stripe: {
+    secretKey: env.STRIPE_SECRET_KEY,
+    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    enabled: Boolean(env.STRIPE_SECRET_KEY),
+  },
 } as const;
 
 export type AppConfig = typeof config;

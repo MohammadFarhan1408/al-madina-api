@@ -58,3 +58,13 @@ export const contactLimiter = createLimiter({
   windowMs: 60 * 60 * 1000,
   limit: 3,
 });
+export const newsletterLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+});
+
+/** Guest order lookup is guarded only by reference + email, so throttle guessing. */
+export const orderLookupLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+});

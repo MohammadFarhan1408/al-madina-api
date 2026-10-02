@@ -35,6 +35,9 @@ export function createApp(): Application {
     }),
   );
   app.use(compression());
+  // Webhooks are signed over the exact bytes sent, so they get the raw body
+  // (parsed later, after verification) — this must run before express.json.
+  app.use(['/v1/payments/callback', '/v1/payments/stripe/webhook'], express.raw({ type: 'application/json', limit: '1mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());
@@ -47,19 +50,16 @@ export function createApp(): Application {
 
   // ─── Health check ────────────────────────────────────────────────────────
   app.get('/health', (_req: Request, res: Response) => {
-    sendSuccess(res, {
-      status: 'ok',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-      env: config.env,
-    });
+    sendSuccess(res, { status: 'ok' });
   });
 
   // ─── API documentation ────────────────────────────────────────────────────
-  app.get('/docs.json', (_req: Request, res: Response) => {
-    res.json(openApiSpec);
-  });
-  app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, { customSiteTitle: 'Al Madina API' }));
+  if (config.isDev) {
+    app.get('/docs.json', (_req: Request, res: Response) => {
+      res.json(openApiSpec);
+    });
+    app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, { customSiteTitle: 'Al Madina API' }));
+  }
 
   // ─── API routes ──────────────────────────────────────────────────────────
   app.use('/v1', globalLimiter, apiRouter);

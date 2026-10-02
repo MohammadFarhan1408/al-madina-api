@@ -10,6 +10,7 @@ process.env.MONGO_URI = 'mongodb://127.0.0.1:27017/al-madina-test';
 process.env.JWT_ACCESS_SECRET = 'test_access_secret_at_least_16_chars';
 process.env.JWT_REFRESH_SECRET = 'test_refresh_secret_at_least_16_chars';
 process.env.JWT_ACCESS_EXPIRY = '15m';
+process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret'; // webhook only; no STRIPE_SECRET_KEY, so card stays simulated
 process.env.REDIS_URL = 'redis://127.0.0.1:6399'; // unreachable: cache/jobs degrade gracefully
 
 let mongod: MongoMemoryServer;

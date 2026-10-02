@@ -119,7 +119,7 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 /** Payment providers backing a transaction. 'cod' is real; 'simulated' stands
  * in for card/wallet until a real gateway is chosen (see payments/providers). */
-export const PAYMENT_PROVIDERS = ['cod', 'simulated'] as const;
+export const PAYMENT_PROVIDERS = ['cod', 'simulated', 'stripe'] as const;
 export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
 /** Per-attempt transaction status. An order can have multiple transactions

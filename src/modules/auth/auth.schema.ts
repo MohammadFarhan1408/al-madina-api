@@ -1,10 +1,18 @@
 import { z } from 'zod';
 
-/** POST /auth/sign-up (§10 — fullName min 2, email valid, password min 6). */
+/** Shared by sign-up and reset: 8+ chars with at least one letter and one digit. */
+const newPassword = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(128)
+  .regex(/[A-Za-z]/, 'Password must include a letter')
+  .regex(/\d/, 'Password must include a number');
+
+/** POST /auth/sign-up (§10 — fullName min 2, email valid, password policy). */
 export const signUpSchema = z.object({
   fullName: z.string().trim().min(2, 'Full name must be at least 2 characters').max(100),
   email: z.string().trim().toLowerCase().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  password: newPassword,
 });
 
 /** POST /auth/sign-in. */
@@ -26,7 +34,7 @@ export const forgotPasswordSchema = z.object({
 /** POST /auth/reset-password. */
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, 'Reset token is required'),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  password: newPassword,
 });
 
 export type SignUpInput = z.infer<typeof signUpSchema>;

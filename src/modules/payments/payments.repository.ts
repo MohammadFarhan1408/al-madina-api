@@ -27,6 +27,10 @@ export const paymentsRepository = {
     return Transaction.findById(id).exec();
   },
 
+  findByProviderReference(providerReference: string): Promise<ITransaction | null> {
+    return Transaction.findOne({ providerReference }).exec();
+  },
+
   findLatestByOrder(orderId: string): Promise<ITransaction | null> {
     return Transaction.findOne({ orderId: new Types.ObjectId(orderId) }).sort({ createdAt: -1, _id: -1 }).exec();
   },

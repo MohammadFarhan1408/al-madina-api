@@ -10,7 +10,7 @@ import { ordersService } from '../orders/orders.service';
 import { paymentsService } from '../payments/payments.service';
 import { notificationsRepository } from '../notifications/notifications.repository';
 import { addressesRepository } from '../addresses/addresses.repository';
-import { User, Cart } from '../../database/models';
+import { User, Cart, UserPreference } from '../../database/models';
 import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { uploadToCloudinary, type UploadType } from '../../storage/upload';
@@ -29,6 +29,7 @@ export const adminService = {
     if (!data.slug && data.name) data.slug = slugify(data.name);
     const product = await productsRepository.create(data);
     await productsService.invalidateAll();
+    await categoriesService.invalidateCache(); // category product counts
     return product;
   },
 
@@ -36,6 +37,7 @@ export const adminService = {
     const product = await productsRepository.update(id, data);
     if (!product) throw ApiError.notFound('Product not found', ERROR_CODES.PRODUCT_NOT_FOUND);
     await productsService.invalidateProduct(id);
+    if (data.categoryId) await categoriesService.invalidateCache();
     // Back-in-stock alert for anyone who wishlisted this product (§15).
     if (data.inStock === true) {
       void queuePush({ type: 'back-in-stock', productId: id, productName: product.name });
@@ -47,6 +49,7 @@ export const adminService = {
     const product = await productsRepository.softDelete(id);
     if (!product) throw ApiError.notFound('Product not found', ERROR_CODES.PRODUCT_NOT_FOUND);
     await productsService.invalidateAll();
+    await categoriesService.invalidateCache();
   },
 
   async addProductImages(id: string, files: Express.Multer.File[]): Promise<IProduct> {
@@ -198,7 +201,21 @@ export const adminService = {
   async broadcast(input: { kind: NotificationKind; title: string; body: string; tier?: UserTier }) {
     const filter: Record<string, unknown> = { isActive: true };
     if (input.tier) filter.tier = input.tier;
-    const users = await User.find(filter).select('_id').lean<{ _id: Types.ObjectId }[]>().exec();
+    let users = await User.find(filter).select('_id').lean<{ _id: Types.ObjectId }[]>().exec();
+
+    // A 'promo' broadcast respects promosEnabled; other kinds (order/system/
+    // wishlist) aren't promotional and always reach everyone matched above.
+    if (input.kind === 'promo' && users.length > 0) {
+      const optedOut = await UserPreference.find({
+        userId: { $in: users.map((u) => u._id) },
+        promosEnabled: false,
+      })
+        .select('userId')
+        .lean<{ userId: Types.ObjectId }[]>()
+        .exec();
+      const optedOutIds = new Set(optedOut.map((p) => p.userId.toString()));
+      users = users.filter((u) => !optedOutIds.has(u._id.toString()));
+    }
 
     const docs = users.map((u) => ({
       userId: u._id,
@@ -218,6 +235,11 @@ export const adminService = {
   // ─── Upload ──────────────────────────────────────────────────────────────────
   uploadImage(file: Express.Multer.File, type: UploadType) {
     return uploadToCloudinary(file, type);
+  },
+
+  // ─── Contact submissions ─────────────────────────────────────────────────────
+  listContactSubmissions(page: number, limit: number) {
+    return adminRepository.listContactSubmissions(page, limit);
   },
 
   // ─── Dashboard ───────────────────────────────────────────────────────────────

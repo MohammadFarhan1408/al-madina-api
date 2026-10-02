@@ -15,6 +15,11 @@ export const usersController = {
     sendSuccess(res, user);
   },
 
+  async getPreferences(req: Request, res: Response): Promise<void> {
+    const prefs = await usersService.getPreferences(userId(req));
+    sendSuccess(res, prefs);
+  },
+
   async updatePreferences(req: Request, res: Response): Promise<void> {
     const prefs = await usersService.updatePreferences(userId(req), req.body);
     sendSuccess(res, prefs);
