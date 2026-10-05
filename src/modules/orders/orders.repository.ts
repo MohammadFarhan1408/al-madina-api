@@ -1,6 +1,7 @@
 import { Types, type FilterQuery } from 'mongoose';
 import { Order, type IOrder, type IOrderItem, type IShippingAddress } from '../../database/models';
 import { paginate } from '../../utils/paginate';
+import { escapeRegex } from '../../utils/escape-regex';
 import type { Paginated } from '../../types/api.types';
 import type { OrderStatus, DeliveryMethod, PaymentMethod, PaymentStatus } from '../../constants/business';
 
@@ -25,6 +26,7 @@ export const ordersRepository = {
     return Order.create({
       ...data,
       userId: data.userId ? new Types.ObjectId(data.userId) : null,
+      statusHistory: [{ status: 'processing', at: new Date() }],
     });
   },
 
@@ -65,6 +67,9 @@ export const ordersRepository = {
     limit: number,
     filters: {
       status?: OrderStatus;
+      paymentStatus?: PaymentStatus;
+      /** Matches reference, guest email or the shipping name. */
+      q?: string;
       from?: Date;
       to?: Date;
       sortBy?: 'reference' | 'placedAt' | 'total' | 'status';
@@ -73,6 +78,12 @@ export const ordersRepository = {
   ): Promise<Paginated<IOrder>> {
     const filter: FilterQuery<IOrder> = { deletedAt: null };
     if (filters.status) filter.status = filters.status;
+    if (filters.paymentStatus) filter.paymentStatus = filters.paymentStatus;
+    if (filters.q) {
+      const re = new RegExp(escapeRegex(filters.q), 'i');
+
+      filter.$or = [{ reference: re }, { guestEmail: re }, { 'shippingAddress.fullName': re }];
+    }
     if (filters.from || filters.to) {
       filter.placedAt = {};
       if (filters.from) filter.placedAt.$gte = filters.from;
@@ -83,10 +94,11 @@ export const ordersRepository = {
     return paginate<IOrder>(Order, filter, { page, limit, sort: { [sortBy]: sortOrder } });
   },
 
-  updateStatus(id: string, status: OrderStatus): Promise<IOrder | null> {
+  updateStatus(id: string, status: OrderStatus, actorId?: string): Promise<IOrder | null> {
+    const by = actorId && Types.ObjectId.isValid(actorId) ? new Types.ObjectId(actorId) : null;
     return Order.findOneAndUpdate(
       { _id: id, deletedAt: null },
-      { $set: { status } },
+      { $set: { status }, $push: { statusHistory: { status, at: new Date(), by } } },
       { new: true },
     ).exec();
   },
