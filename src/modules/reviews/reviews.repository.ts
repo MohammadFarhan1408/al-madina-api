@@ -66,17 +66,52 @@ export const reviewsRepository = {
 
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
-  listAll(
+  /** Admin list; each review also carries `productName` so a moderator can
+   *  tell what is being reviewed. */
+  async listAll(
     page: number,
     limit: number,
     rating?: number,
     sortBy: 'rating' | 'date' = 'date',
     sortOrder: 'asc' | 'desc' = 'desc',
-  ): Promise<Paginated<IReview>> {
+  ): Promise<Paginated<IReview & { productName?: string }>> {
     const filter: Record<string, unknown> = { deletedAt: null };
     if (rating) filter.rating = rating;
     const field = sortBy === 'rating' ? 'rating' : 'date';
-    return paginate<IReview>(Review, filter, { page, limit, sort: { [field]: sortOrder === 'asc' ? 1 : -1 } });
+    const result = await paginate<IReview>(Review, filter, {
+      page,
+      limit,
+      sort: { [field]: sortOrder === 'asc' ? 1 : -1 },
+    });
+    const products = await Product.find({ _id: { $in: result.items.map((r) => r.productId) } })
+      .select('name')
+      .lean<{ _id: Types.ObjectId; name: string }[]>()
+      .exec();
+    const names = new Map(products.map((p) => [p._id.toString(), p.name]));
+    return {
+      ...result,
+      // Lean rows are plain objects; the Document type is only nominal here.
+      items: result.items.map((r) => ({ ...r, productName: names.get(String(r.productId)) })) as (IReview & {
+        productName?: string;
+      })[],
+    };
+  },
+
+  /** Average rating and 1–5 star distribution across live reviews. */
+  async summary(): Promise<{ average: number; total: number; distribution: Record<1 | 2 | 3 | 4 | 5, number> }> {
+    const rows = await Review.aggregate<{ _id: number; count: number }>([
+      { $match: { deletedAt: null } },
+      { $group: { _id: '$rating', count: { $sum: 1 } } },
+    ]);
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    let total = 0;
+    let sum = 0;
+    for (const r of rows) {
+      distribution[r._id as 1 | 2 | 3 | 4 | 5] = r.count;
+      total += r.count;
+      sum += r._id * r.count;
+    }
+    return { average: total ? Math.round((sum / total) * 10) / 10 : 0, total, distribution };
   },
 
   async softDelete(id: string): Promise<IReview | null> {

@@ -57,8 +57,11 @@ export const adminController = {
   async listOrders(req: Request, res: Response) {
     sendSuccess(res, await adminService.listOrders(req.query as never));
   },
+  async getOrder(req: Request, res: Response) {
+    sendSuccess(res, await adminService.getOrder(req.params.id));
+  },
   async updateOrderStatus(req: Request, res: Response) {
-    sendSuccess(res, await adminService.updateOrderStatus(req.params.id, req.body.status));
+    sendSuccess(res, await adminService.updateOrderStatus(req.params.id, req.body.status, req.user?.id));
   },
   async orderStats(_req: Request, res: Response) {
     sendSuccess(res, await adminService.orderStats());
@@ -88,6 +91,10 @@ export const adminController = {
   async updateUserTier(req: Request, res: Response) {
     sendSuccess(res, await adminService.updateUserTier(req.params.id, req.body.tier));
   },
+  async reactivateUser(req: Request, res: Response) {
+    await adminService.reactivateUser(req.params.id);
+    sendSuccess(res, null, 200, 'User reactivated');
+  },
   async deactivateUser(req: Request, res: Response) {
     await adminService.deactivateUser(req.params.id);
     sendSuccess(res, null, 200, 'User deactivated');
@@ -112,6 +119,9 @@ export const adminController = {
   // Dashboard
   async dashboard(_req: Request, res: Response) {
     sendSuccess(res, await adminService.dashboard());
+  },
+  async dashboardSummary(req: Request, res: Response) {
+    sendSuccess(res, await adminService.dashboardSummary(req.query as never));
   },
 
   // Contact submissions

@@ -16,6 +16,7 @@ import {
   collectionProductSchema,
   updateOrderStatusSchema,
   adminOrdersQuerySchema,
+  dashboardSummaryQuerySchema,
   adminUsersQuerySchema,
   updateTierSchema,
   broadcastSchema,
@@ -36,6 +37,7 @@ router.use(requireAuth, requireRole('admin', 'manager'), auditLog);
 
 // ─── Dashboard & stats ───────────────────────────────────────────────────────
 router.get('/dashboard', asyncHandler(adminController.dashboard));
+router.get('/dashboard/summary', validate({ query: dashboardSummaryQuerySchema }), asyncHandler(adminController.dashboardSummary));
 
 // ─── Products ──────────────────────────────────────────────────────────────────
 router.post('/products', validate({ body: createProductSchema }), asyncHandler(adminController.createProduct));
@@ -58,6 +60,7 @@ router.delete('/collections/:id/products/:productId', validate({ params: objectI
 // ─── Orders ────────────────────────────────────────────────────────────────────
 router.get('/orders', validate({ query: adminOrdersQuerySchema }), asyncHandler(adminController.listOrders));
 router.get('/orders/stats', asyncHandler(adminController.orderStats));
+router.get('/orders/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.getOrder));
 router.patch('/orders/:id/status', validate({ params: objectIdParam(), body: updateOrderStatusSchema }), asyncHandler(adminController.updateOrderStatus));
 router.get('/orders/:id/transactions', validate({ params: objectIdParam() }), asyncHandler(adminController.orderTransactions));
 router.post('/orders/:id/payments/refund', validate({ params: objectIdParam(), body: refundPaymentSchema }), asyncHandler(adminController.refundPayment));
@@ -67,6 +70,7 @@ router.get('/users', validate({ query: adminUsersQuerySchema }), asyncHandler(ad
 router.get('/users/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.getUser));
 router.patch('/users/:id/tier', validate({ params: objectIdParam(), body: updateTierSchema }), asyncHandler(adminController.updateUserTier));
 router.delete('/users/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.deactivateUser));
+router.post('/users/:id/reactivate', validate({ params: objectIdParam() }), asyncHandler(adminController.reactivateUser));
 
 // ─── Notifications broadcast ─────────────────────────────────────────────────────
 router.get('/notifications', validate({ query: notificationHistoryQuerySchema }), asyncHandler(adminController.notificationHistory));
@@ -74,6 +78,7 @@ router.post('/notifications', validate({ body: broadcastSchema }), asyncHandler(
 
 // ─── Reviews ───────────────────────────────────────────────────────────────────
 router.get('/reviews', validate({ query: adminReviewsQuerySchema }), asyncHandler(reviewsController.listAll));
+router.get('/reviews/summary', asyncHandler(reviewsController.summary));
 router.delete('/reviews/:id', validate({ params: objectIdParam() }), asyncHandler(reviewsController.remove));
 
 // ─── Upload ────────────────────────────────────────────────────────────────────

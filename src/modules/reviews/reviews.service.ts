@@ -64,6 +64,10 @@ export const reviewsService = {
     return reviewsRepository.listAll(page, limit, rating, sortBy, sortOrder);
   },
 
+  summary() {
+    return reviewsRepository.summary();
+  },
+
   async remove(id: string): Promise<void> {
     const review = await reviewsRepository.softDelete(id);
     if (!review) {

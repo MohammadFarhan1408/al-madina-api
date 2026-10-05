@@ -8,6 +8,7 @@ import {
   type IContactSubmission,
 } from '../../database/models';
 import { paginate } from '../../utils/paginate';
+import { escapeRegex } from '../../utils/escape-regex';
 import type { Paginated } from '../../types/api.types';
 import type { UserTier, NotificationKind } from '../../constants/business';
 
@@ -34,7 +35,7 @@ export const adminRepository = {
     const filter: Record<string, unknown> = {};
     if (tier) filter.tier = tier;
     if (q) {
-      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const regex = new RegExp(escapeRegex(q), 'i');
       filter.$or = [{ fullName: regex }, { email: regex }];
     }
     return paginate<IUser>(User, filter, { page, limit, sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 } });
@@ -45,6 +46,15 @@ export const adminRepository = {
     return User.findById(id).exec();
   },
 
+  /** Non-cancelled order count and spend per customer — one grouped query. */
+  async orderStatsByUser(ids: Types.ObjectId[]): Promise<Map<string, { orderCount: number; totalSpent: number }>> {
+    const rows = await Order.aggregate<{ _id: Types.ObjectId; orderCount: number; totalSpent: number }>([
+      { $match: { userId: { $in: ids }, deletedAt: null, status: { $ne: 'cancelled' } } },
+      { $group: { _id: '$userId', orderCount: { $sum: 1 }, totalSpent: { $sum: '$total' } } },
+    ]);
+    return new Map(rows.map((r) => [r._id.toString(), { orderCount: r.orderCount, totalSpent: r.totalSpent }]));
+  },
+
   updateTier(id: string, tier: UserTier): Promise<IUser | null> {
     if (!Types.ObjectId.isValid(id)) return Promise.resolve(null);
     return User.findByIdAndUpdate(id, { $set: { tier } }, { new: true }).exec();
@@ -53,6 +63,11 @@ export const adminRepository = {
   deactivate(id: string): Promise<IUser | null> {
     if (!Types.ObjectId.isValid(id)) return Promise.resolve(null);
     return User.findByIdAndUpdate(id, { $set: { isActive: false } }, { new: true }).exec();
+  },
+
+  reactivate(id: string): Promise<IUser | null> {
+    if (!Types.ObjectId.isValid(id)) return Promise.resolve(null);
+    return User.findByIdAndUpdate(id, { $set: { isActive: true } }, { new: true }).exec();
   },
 
   countUsers(): Promise<number> {
@@ -117,15 +132,22 @@ export const adminRepository = {
     return Order.find({ deletedAt: null }).sort({ placedAt: -1 }).limit(limit).lean().exec();
   },
 
-  /** Top products by revenue from order line items. */
-  topProducts(limit = 5) {
+  /** Top products by revenue from order line items, optionally within a date range. */
+  topProducts(limit = 5, range?: { from: Date; to: Date }) {
     return Order.aggregate([
-      { $match: { deletedAt: null, status: { $ne: 'cancelled' } } },
+      {
+        $match: {
+          deletedAt: null,
+          status: { $ne: 'cancelled' },
+          ...(range ? { placedAt: { $gte: range.from, $lte: range.to } } : {}),
+        },
+      },
       { $unwind: '$items' },
       {
         $group: {
           _id: '$items.productId',
           name: { $first: '$items.productName' },
+          image: { $first: '$items.productImage' },
           revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
           unitsSold: { $sum: '$items.quantity' },
         },
@@ -133,5 +155,43 @@ export const adminRepository = {
       { $sort: { revenue: -1 } },
       { $limit: limit },
     ]);
+  },
+
+  // ─── Dashboard summary (date-ranged) ────────────────────────────────────────
+
+  /** Revenue + orders per bucket, order counts per status, and sign-ups per
+   *  bucket for [from, to]. Buckets are calendar days/months in `tz`. */
+  async summaryAggregates(from: Date, to: Date, granularity: 'day' | 'month', tz: string) {
+    const format = granularity === 'month' ? '%Y-%m' : '%Y-%m-%d';
+    const bucket = (field: string) => ({ $dateToString: { format, date: field, timezone: tz } });
+    const placed = { deletedAt: null, placedAt: { $gte: from, $lte: to } };
+
+    const [sales, statuses, signups] = await Promise.all([
+      Order.aggregate<{ _id: string; revenue: number; orders: number }>([
+        { $match: { ...placed, status: { $ne: 'cancelled' } } },
+        { $group: { _id: bucket('$placedAt'), revenue: { $sum: '$total' }, orders: { $sum: 1 } } },
+      ]),
+      Order.aggregate<{ _id: string; count: number }>([
+        { $match: placed },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+      User.aggregate<{ _id: string; count: number }>([
+        { $match: { role: 'user', createdAt: { $gte: from, $lte: to } } },
+        { $group: { _id: bucket('$createdAt'), count: { $sum: 1 } } },
+      ]),
+    ]);
+    return { sales, statuses, signups };
+  },
+
+  /** Totals for one range — used for the previous-period comparison. */
+  async rangeTotals(from: Date, to: Date): Promise<{ revenue: number; orders: number; newCustomers: number }> {
+    const [[sales], newCustomers] = await Promise.all([
+      Order.aggregate<{ revenue: number; orders: number }>([
+        { $match: { deletedAt: null, status: { $ne: 'cancelled' }, placedAt: { $gte: from, $lt: to } } },
+        { $group: { _id: null, revenue: { $sum: '$total' }, orders: { $sum: 1 } } },
+      ]),
+      User.countDocuments({ role: 'user', createdAt: { $gte: from, $lt: to } }).exec(),
+    ]);
+    return { revenue: sales?.revenue ?? 0, orders: sales?.orders ?? 0, newCustomers };
   },
 };
