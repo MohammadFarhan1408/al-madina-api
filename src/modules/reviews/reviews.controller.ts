@@ -27,6 +27,10 @@ export const reviewsController = {
     sendSuccess(res, result);
   },
 
+  async summary(_req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await reviewsService.summary());
+  },
+
   async remove(req: Request, res: Response): Promise<void> {
     await reviewsService.remove(req.params.id);
     sendSuccess(res, null, 200, 'Review removed');
