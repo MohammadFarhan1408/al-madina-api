@@ -25,6 +25,7 @@ import {
   adminReviewsQuerySchema,
   uploadQuerySchema,
   adminContactQuerySchema,
+  adminActivityQuerySchema,
 } from './admin.schema';
 import { objectIdParam } from '../../utils/common.schema';
 import { validate, requireAuth, requireRole, auditLog } from '../../middlewares';
@@ -85,6 +86,9 @@ router.delete('/reviews/:id', validate({ params: objectIdParam() }), asyncHandle
 
 // ─── Upload ────────────────────────────────────────────────────────────────────
 router.post('/upload', validate({ query: uploadQuerySchema }), uploadSingle('file'), asyncHandler(adminController.upload));
+
+// ─── Activity log — admins only (it shows what managers did, too) ────────────────
+router.get('/activity', requireRole('admin'), validate({ query: adminActivityQuerySchema }), asyncHandler(adminController.listActivity));
 
 // ─── Contact submissions ─────────────────────────────────────────────────────────
 router.get('/contact', validate({ query: adminContactQuerySchema }), asyncHandler(adminController.listContactSubmissions));

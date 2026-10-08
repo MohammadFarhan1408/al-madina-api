@@ -322,6 +322,15 @@ export const adminService = {
     return uploadToCloudinary(file, type);
   },
 
+  // ─── Activity log ────────────────────────────────────────────────────────────
+  listActivity(
+    page: number,
+    limit: number,
+    filters: { q?: string; method?: string; from?: Date; to?: Date },
+  ) {
+    return adminRepository.listActivity(page, limit, filters);
+  },
+
   // ─── Contact submissions ─────────────────────────────────────────────────────
   listContactSubmissions(page: number, limit: number) {
     return adminRepository.listContactSubmissions(page, limit);

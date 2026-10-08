@@ -127,6 +127,19 @@ export const adminController = {
     sendSuccess(res, await adminService.dashboardSummary(req.query as never));
   },
 
+  // Activity log
+  async listActivity(req: Request, res: Response) {
+    const { page, limit, ...filters } = req.query as never as {
+      page: number;
+      limit: number;
+      q?: string;
+      method?: string;
+      from?: Date;
+      to?: Date;
+    };
+    sendSuccess(res, await adminService.listActivity(page, limit, filters));
+  },
+
   // Contact submissions
   async listContactSubmissions(req: Request, res: Response) {
     const { page, limit } = req.query as never as { page: number; limit: number };
