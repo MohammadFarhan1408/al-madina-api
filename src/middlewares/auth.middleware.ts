@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
+import { User } from '../database/models';
 import { ApiError } from '../utils/api-error';
 import { ERROR_CODES } from '../constants/error-codes';
 import type { UserRole } from '../constants/business';
@@ -55,15 +56,30 @@ export const authOptional: RequestHandler = (req, _res, next) => {
 /**
  * Require the authenticated user to hold one of the given roles. Must run after
  * requireAuth. `admin` implicitly satisfies any role check.
+ *
+ * The role and active flag are re-read from the database rather than trusted
+ * from the token, so a demoted or deactivated staff member loses access on their
+ * next request instead of when their access token expires. One indexed lookup
+ * per staff request — admin traffic is small.
  */
 export function requireRole(...roles: UserRole[]): RequestHandler {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {
       throw ApiError.unauthorized('Authentication required', ERROR_CODES.UNAUTHORIZED);
     }
-    if (req.user.role === 'admin' || roles.includes(req.user.role)) {
-      return next();
-    }
-    throw ApiError.forbidden('Insufficient permissions', ERROR_CODES.FORBIDDEN);
+    const userId = req.user.id;
+    User.findById(userId)
+      .select('role isActive')
+      .lean<{ role: UserRole; isActive: boolean }>()
+      .exec()
+      .then((current) => {
+        if (!current || !current.isActive) {
+          throw ApiError.unauthorized('Account no longer active', ERROR_CODES.ACCOUNT_INACTIVE);
+        }
+        if (req.user) req.user.role = current.role;
+        if (current.role === 'admin' || roles.includes(current.role)) return next();
+        throw ApiError.forbidden('Insufficient permissions', ERROR_CODES.FORBIDDEN);
+      })
+      .catch(next);
   };
 }

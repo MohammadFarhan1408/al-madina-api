@@ -10,6 +10,7 @@ import { ordersService } from '../orders/orders.service';
 import { paymentsService } from '../payments/payments.service';
 import { notificationsRepository } from '../notifications/notifications.repository';
 import { addressesRepository } from '../addresses/addresses.repository';
+import { authRepository } from '../auth/auth.repository';
 import { User, Cart, UserPreference } from '../../database/models';
 import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
@@ -19,6 +20,7 @@ import { slugify } from '../../utils/slugify';
 import { Types } from 'mongoose';
 import type { UserTier, OrderStatus, PaymentStatus, NotificationKind } from '../../constants/business';
 import type { IProduct, ICategory, ICollection } from '../../database/models';
+import type { AuthUser } from '../../types/api.types';
 
 /** Dashboard buckets are calendar days/months in the business's timezone. */
 const DASHBOARD_TZ = 'Asia/Dubai';
@@ -55,6 +57,20 @@ const BULK_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   delivered: [],
   cancelled: [],
 };
+
+/** Who may change another account: nobody changes their own (no locking yourself
+ *  out, no self-promotion of tier), and only an admin may change an admin. */
+async function assertCanManage(actor: AuthUser, targetId: string) {
+  if (actor.id === targetId) {
+    throw ApiError.badRequest('You cannot change your own account here', ERROR_CODES.BAD_REQUEST);
+  }
+  const target = await adminRepository.findUserById(targetId);
+  if (!target) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
+  if (target.role === 'admin' && actor.role !== 'admin') {
+    throw ApiError.forbidden('Only an admin can change an admin account', ERROR_CODES.FORBIDDEN);
+  }
+  return target;
+}
 
 export const adminService = {
   // ─── Products ──────────────────────────────────────────────────────────────
@@ -266,20 +282,25 @@ export const adminService = {
     return { user, stats, recentOrders: orders.items, addresses, cart: cart?.items ?? [] };
   },
 
-  async updateUserTier(id: string, tier: UserTier) {
+  async updateUserTier(actor: AuthUser, id: string, tier: UserTier) {
+    await assertCanManage(actor, id);
     const user = await adminRepository.updateTier(id, tier);
     if (!user) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
     return user;
   },
 
-  async reactivateUser(id: string): Promise<void> {
+  async reactivateUser(actor: AuthUser, id: string): Promise<void> {
+    await assertCanManage(actor, id);
     const user = await adminRepository.reactivate(id);
     if (!user) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
   },
 
-  async deactivateUser(id: string): Promise<void> {
+  async deactivateUser(actor: AuthUser, id: string): Promise<void> {
+    await assertCanManage(actor, id);
     const user = await adminRepository.deactivate(id);
     if (!user) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
+    // End every session now, not when the refresh token would have expired.
+    await authRepository.revokeAllRefreshTokensForUser(user._id);
   },
 
   // ─── Notifications broadcast ─────────────────────────────────────────────────

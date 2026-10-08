@@ -48,8 +48,26 @@ export const authRepository = {
 
   // ─── Refresh tokens ────────────────────────────────────────────────────────
 
-  createRefreshToken(userId: Types.ObjectId, tokenHash: string, expiresAt: Date): Promise<IRefreshToken> {
-    return RefreshToken.create({ userId, token: tokenHash, expiresAt });
+  createRefreshToken(
+    userId: Types.ObjectId,
+    tokenHash: string,
+    expiresAt: Date,
+    session: { familyId: string; sessionExpiresAt?: Date },
+  ): Promise<IRefreshToken> {
+    return RefreshToken.create({ userId, token: tokenHash, expiresAt, ...session });
+  },
+
+  /** Spend a live refresh token in one atomic step, so two concurrent refreshes
+   *  with the same token can't both succeed. Returns the token as it was before. */
+  consumeRefreshToken(tokenHash: string): Promise<IRefreshToken | null> {
+    return RefreshToken.findOneAndUpdate(
+      { token: tokenHash, revokedAt: null, expiresAt: { $gt: new Date() } },
+      { $set: { revokedAt: new Date() } },
+    ).exec();
+  },
+
+  async revokeRefreshTokenFamily(familyId: string): Promise<void> {
+    await RefreshToken.updateMany({ familyId, revokedAt: null }, { $set: { revokedAt: new Date() } }).exec();
   },
 
   findRefreshToken(tokenHash: string): Promise<IRefreshToken | null> {

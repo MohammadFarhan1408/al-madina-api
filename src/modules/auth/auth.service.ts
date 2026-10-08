@@ -14,7 +14,9 @@ import {
   generateOpaqueToken,
   hashToken,
 } from '../../utils/hash';
-import { signAccessToken, refreshTokenExpiry } from '../../utils/jwt';
+import { randomUUID } from 'node:crypto';
+import { signAccessToken, refreshTokenExpiry, parseDurationMs } from '../../utils/jwt';
+import { config } from '../../config';
 import { logger } from '../../config/logger';
 import { queueEmail } from '../../jobs/queues/email.queue';
 import { queueNotification } from '../../jobs/queues/notification.queue';
@@ -22,11 +24,23 @@ import { buildResetUrl } from '../../emails/templates';
 import type { IUser } from '../../database/models';
 import type { UserRole, UserTier } from '../../constants/business';
 
+/** Staff sessions are capped (config.jwt.adminSessionTtl); customers' are not. */
+const isStaff = (role: string) => role === 'admin' || role === 'manager';
+
+/** A rotated token that was spent this recently is treated as a race between two
+ *  tabs/requests, not theft — so it doesn't trigger a family-wide revoke. */
+const REUSE_GRACE_MS = 30_000;
+
 /**
  * Issue an access token plus a fresh opaque refresh token (stored hashed).
  * Centralised so sign-up, sign-in, and refresh all produce identical pairs.
+ * A rotation passes the previous token's session so the family and the
+ * absolute staff cap carry over unchanged.
  */
-async function issueTokens(user: IUser): Promise<TokenPair> {
+async function issueTokens(
+  user: IUser,
+  session?: { familyId?: string; sessionExpiresAt?: Date },
+): Promise<TokenPair> {
   const accessToken = signAccessToken({
     sub: user._id.toString(),
     email: user.email,
@@ -34,10 +48,19 @@ async function issueTokens(user: IUser): Promise<TokenPair> {
     role: user.role as UserRole,
   });
 
-  const { token: refreshToken, hash } = generateOpaqueToken();
-  await authRepository.createRefreshToken(user._id, hash, refreshTokenExpiry());
+  const sessionExpiresAt =
+    session?.sessionExpiresAt ??
+    (isStaff(user.role) ? new Date(Date.now() + parseDurationMs(config.jwt.adminSessionTtl)) : undefined);
+  const sliding = refreshTokenExpiry();
+  const refreshExpiresAt = sessionExpiresAt && sessionExpiresAt < sliding ? sessionExpiresAt : sliding;
 
-  return { accessToken, refreshToken };
+  const { token: refreshToken, hash } = generateOpaqueToken();
+  await authRepository.createRefreshToken(user._id, hash, refreshExpiresAt, {
+    familyId: session?.familyId ?? randomUUID(),
+    sessionExpiresAt,
+  });
+
+  return { accessToken, refreshToken, refreshExpiresAt };
 }
 
 export const authService = {
@@ -88,37 +111,47 @@ export const authService = {
     return { user: toPublicUser(user), ...tokens };
   },
 
-  /** Revoke a refresh token (§ POST /auth/sign-out). Idempotent. */
+  /** Revoke a refresh token (§ POST /auth/sign-out). Idempotent, and needs only
+   *  the refresh token — so signing out still works after the access token expired. */
   async signOut(refreshToken: string): Promise<void> {
     await authRepository.revokeRefreshToken(hashToken(refreshToken));
   },
 
   /**
-   * Rotate a refresh token: validate it, revoke it, and issue a new pair
-   * (§12 Rotation). Reuse of a revoked/expired token is rejected.
+   * Rotate a refresh token (§12 Rotation): spend it atomically and issue a new
+   * pair in the same family. Presenting a token that was already spent (outside
+   * a short race window) means it was copied — the whole family is revoked so
+   * neither the thief nor the victim keeps a live session.
    */
   async refresh(refreshToken: string): Promise<TokenPair> {
     const tokenHash = hashToken(refreshToken);
-    const stored = await authRepository.findRefreshToken(tokenHash);
+    const spent = await authRepository.consumeRefreshToken(tokenHash);
 
-    if (!stored) {
-      throw ApiError.unauthorized('Invalid refresh token', ERROR_CODES.TOKEN_INVALID);
-    }
-    if (stored.revokedAt) {
-      throw ApiError.unauthorized('Refresh token has been revoked', ERROR_CODES.TOKEN_REVOKED);
-    }
-    if (stored.expiresAt.getTime() < Date.now()) {
+    if (!spent) {
+      const stored = await authRepository.findRefreshToken(tokenHash);
+
+      if (!stored) {
+        throw ApiError.unauthorized('Invalid refresh token', ERROR_CODES.TOKEN_INVALID);
+      }
+      if (stored.revokedAt) {
+        if (stored.familyId && Date.now() - stored.revokedAt.getTime() > REUSE_GRACE_MS) {
+          await authRepository.revokeRefreshTokenFamily(stored.familyId);
+          logger.warn(
+            { userId: stored.userId.toString(), familyId: stored.familyId },
+            'Refresh token reuse detected — session family revoked',
+          );
+        }
+        throw ApiError.unauthorized('Refresh token has been revoked', ERROR_CODES.TOKEN_REVOKED);
+      }
       throw ApiError.unauthorized('Refresh token has expired', ERROR_CODES.TOKEN_EXPIRED);
     }
 
-    const user = await authRepository.findById(stored.userId.toString());
+    const user = await authRepository.findById(spent.userId.toString());
     if (!user || !user.isActive) {
       throw ApiError.unauthorized('Account no longer active', ERROR_CODES.ACCOUNT_INACTIVE);
     }
 
-    // Rotate: revoke the presented token before issuing a replacement.
-    await authRepository.revokeRefreshToken(tokenHash);
-    return issueTokens(user);
+    return issueTokens(user, { familyId: spent.familyId, sessionExpiresAt: spent.sessionExpiresAt });
   },
 
   /** Return the current authenticated user (§ GET /auth/me). */

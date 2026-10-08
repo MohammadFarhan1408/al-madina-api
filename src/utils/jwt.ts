@@ -14,6 +14,9 @@ type AccessClaims = Omit<AccessTokenPayload, 'iat' | 'exp'>;
 export function signAccessToken(claims: AccessClaims): string {
   return jwt.sign(claims, config.jwt.accessSecret, {
     expiresIn: config.jwt.accessExpiry,
+    algorithm: 'HS256',
+    issuer: config.jwt.issuer,
+    audience: config.jwt.audience,
   } as SignOptions);
 }
 
@@ -23,7 +26,13 @@ export function signAccessToken(claims: AccessClaims): string {
  */
 export function verifyAccessToken(token: string): AccessTokenPayload {
   try {
-    return jwt.verify(token, config.jwt.accessSecret) as AccessTokenPayload;
+    // Pin the algorithm and the issuer/audience so a token signed some other
+    // way — or minted for another service with the same secret — is rejected.
+    return jwt.verify(token, config.jwt.accessSecret, {
+      algorithms: ['HS256'],
+      issuer: config.jwt.issuer,
+      audience: config.jwt.audience,
+    }) as AccessTokenPayload;
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
       throw ApiError.unauthorized('Access token expired', ERROR_CODES.TOKEN_EXPIRED);
@@ -41,7 +50,7 @@ export function refreshTokenExpiry(now: Date = new Date()): Date {
   return new Date(now.getTime() + ms);
 }
 
-function parseDurationMs(input: string): number {
+export function parseDurationMs(input: string): number {
   const match = /^(\d+)\s*([smhd])$/.exec(input.trim());
   if (!match) {
     // Fall back to 30 days if the format is unrecognised.
