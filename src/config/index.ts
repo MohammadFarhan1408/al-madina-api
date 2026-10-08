@@ -16,9 +16,10 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
 
   JWT_ACCESS_SECRET: z.string().min(16, 'JWT_ACCESS_SECRET must be at least 16 chars'),
-  JWT_REFRESH_SECRET: z.string().min(16, 'JWT_REFRESH_SECRET must be at least 16 chars'),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('30d'),
+  // Absolute cap on an admin/manager session: refresh never extends past it.
+  ADMIN_SESSION_TTL: z.string().default('24h'),
 
   BCRYPT_ROUNDS: z.coerce.number().int().min(8).max(15).default(12),
 
@@ -96,9 +97,11 @@ export const config = {
 
   jwt: {
     accessSecret: env.JWT_ACCESS_SECRET,
-    refreshSecret: env.JWT_REFRESH_SECRET,
     accessExpiry: env.JWT_ACCESS_EXPIRY,
     refreshExpiry: env.JWT_REFRESH_EXPIRY,
+    adminSessionTtl: env.ADMIN_SESSION_TTL,
+    issuer: 'al-madina-api',
+    audience: 'al-madina',
   },
 
   bcrypt: {

@@ -7,6 +7,10 @@ export interface IRefreshToken extends Document {
   token: string; // SHA-256 hash of the opaque refresh token
   expiresAt: Date;
   revokedAt?: Date;
+  /** Every token rotated from one sign-in shares a family; reuse of a spent token revokes the family. */
+  familyId?: string;
+  /** Absolute end of the session (admin/manager only); rotation never moves it. */
+  sessionExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,6 +21,8 @@ const refreshTokenSchema = new Schema<IRefreshToken>(
     token: { type: String, required: true, unique: true, index: true },
     expiresAt: { type: Date, required: true },
     revokedAt: { type: Date },
+    familyId: { type: String, index: true },
+    sessionExpiresAt: { type: Date },
   },
   baseSchemaOptions,
 );

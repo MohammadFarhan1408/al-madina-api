@@ -33,7 +33,6 @@ router.post(
 
 router.post(
   '/sign-out',
-  requireAuth,
   validate({ body: refreshTokenSchema }),
   asyncHandler(authController.signOut),
 );

@@ -92,14 +92,14 @@ export const adminController = {
     sendSuccess(res, await adminService.getUser(req.params.id));
   },
   async updateUserTier(req: Request, res: Response) {
-    sendSuccess(res, await adminService.updateUserTier(req.params.id, req.body.tier));
+    sendSuccess(res, await adminService.updateUserTier(req.user!, req.params.id, req.body.tier));
   },
   async reactivateUser(req: Request, res: Response) {
-    await adminService.reactivateUser(req.params.id);
+    await adminService.reactivateUser(req.user!, req.params.id);
     sendSuccess(res, null, 200, 'User reactivated');
   },
   async deactivateUser(req: Request, res: Response) {
-    await adminService.deactivateUser(req.params.id);
+    await adminService.deactivateUser(req.user!, req.params.id);
     sendSuccess(res, null, 200, 'User deactivated');
   },
 
