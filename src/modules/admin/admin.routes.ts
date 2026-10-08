@@ -58,7 +58,7 @@ router.post('/collections', validate({ body: createCollectionSchema }), asyncHan
 router.patch('/collections/:id', validate({ params: objectIdParam(), body: updateCollectionSchema }), asyncHandler(adminController.updateCollection));
 router.delete('/collections/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.deleteCollection));
 router.post('/collections/:id/products', validate({ params: objectIdParam(), body: collectionProductSchema }), asyncHandler(adminController.addCollectionProduct));
-router.delete('/collections/:id/products/:productId', validate({ params: objectIdParam() }), asyncHandler(adminController.removeCollectionProduct));
+router.delete('/collections/:id/products/:productId', validate({ params: objectIdParam().merge(objectIdParam('productId')) }), asyncHandler(adminController.removeCollectionProduct));
 
 // ─── Orders ────────────────────────────────────────────────────────────────────
 router.get('/orders', validate({ query: adminOrdersQuerySchema }), asyncHandler(adminController.listOrders));

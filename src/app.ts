@@ -11,6 +11,7 @@ import { sendSuccess } from './utils/api-response';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 import swaggerUi from 'swagger-ui-express';
 import { globalLimiter } from './middlewares/rate-limit.middleware';
+import { rejectOperatorKeys } from './middlewares/operator-guard.middleware';
 import { apiRouter } from './routes';
 import { openApiSpec } from './docs/swagger';
 
@@ -41,6 +42,7 @@ export function createApp(): Application {
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());
+  app.use(rejectOperatorKeys);
 
   // ─── Logging ─────────────────────────────────────────────────────────────
   app.use(pinoHttp({ logger }));

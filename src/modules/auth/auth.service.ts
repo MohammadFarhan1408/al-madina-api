@@ -31,6 +31,15 @@ const isStaff = (role: string) => role === 'admin' || role === 'manager';
  *  tabs/requests, not theft — so it doesn't trigger a family-wide revoke. */
 const REUSE_GRACE_MS = 30_000;
 
+/** Lockout: this many wrong passwords in a row locks the account for LOCK_MS. */
+const MAX_FAILED_LOGINS = 5;
+const LOCK_MS = 15 * 60 * 1000;
+
+/** Compared against when the email doesn't exist, so an unknown email takes as
+ *  long as a wrong password and response time doesn't reveal which accounts exist. */
+let dummyHash: Promise<string> | undefined;
+const timingDummy = () => (dummyHash ??= hashPassword('timing-equaliser-not-a-real-password'));
+
 /**
  * Issue an access token plus a fresh opaque refresh token (stored hashed).
  * Centralised so sign-up, sign-in, and refresh all produce identical pairs.
@@ -92,22 +101,49 @@ export const authService = {
     return { user: toPublicUser(user), ...tokens };
   },
 
-  /** Authenticate by email/password (§ POST /auth/sign-in). */
-  async signIn(input: SignInInput): Promise<AuthResult> {
+  /**
+   * Authenticate by email/password (§ POST /auth/sign-in).
+   * Order matters: lockout first, then the password, and only then whether the
+   * account is active — so a deactivated or locked account is never revealed to
+   * someone who doesn't know its password. Staff attempts are audited.
+   */
+  async signIn(input: SignInInput, meta: { ip?: string } = {}): Promise<AuthResult> {
     const user = await authRepository.findByEmailWithPassword(input.email);
     if (!user) {
+      await comparePassword(input.password, await timingDummy());
       throw ApiError.unauthorized('Invalid email or password', ERROR_CODES.INVALID_CREDENTIALS);
     }
-    if (!user.isActive) {
-      throw ApiError.forbidden('Account is deactivated', ERROR_CODES.ACCOUNT_INACTIVE);
+    const audit = (status: number) =>
+      isStaff(user.role) ? authRepository.recordSignIn(user, meta.ip, status).catch(() => undefined) : undefined;
+
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
+      await audit(429);
+      throw ApiError.tooManyRequests(
+        `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+        ERROR_CODES.ACCOUNT_LOCKED,
+      );
     }
 
     const valid = await comparePassword(input.password, user.passwordHash);
     if (!valid) {
+      const failures = await authRepository.recordFailedLogin(user._id);
+      if (failures >= MAX_FAILED_LOGINS) {
+        await authRepository.lockAccount(user._id, new Date(Date.now() + LOCK_MS));
+        logger.warn({ userId: user._id.toString() }, 'Account locked after repeated failed sign-ins');
+      }
+      await audit(401);
       throw ApiError.unauthorized('Invalid email or password', ERROR_CODES.INVALID_CREDENTIALS);
     }
 
+    if (!user.isActive) {
+      await audit(403);
+      throw ApiError.forbidden('Account is deactivated', ERROR_CODES.ACCOUNT_INACTIVE);
+    }
+
+    if (user.failedLoginCount || user.lockedUntil) await authRepository.clearFailedLogins(user._id);
     const tokens = await issueTokens(user);
+    await audit(200);
     return { user: toPublicUser(user), ...tokens };
   },
 

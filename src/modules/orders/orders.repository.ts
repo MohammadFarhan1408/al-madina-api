@@ -1,7 +1,7 @@
 import { Types, type FilterQuery } from 'mongoose';
 import { Order, type IOrder, type IOrderItem, type IShippingAddress } from '../../database/models';
 import { paginate } from '../../utils/paginate';
-import { escapeRegex } from '../../utils/escape-regex';
+import { escapeRegex } from '../../utils/sanitize';
 import type { Paginated } from '../../types/api.types';
 import type { OrderStatus, DeliveryMethod, PaymentMethod, PaymentStatus } from '../../constants/business';
 
