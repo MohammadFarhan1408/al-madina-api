@@ -9,8 +9,8 @@ import type { ApiErrorResponse } from "../types/api.types";
  * (§18 Rate Limiting). `keyByUser` keys per authenticated user when available,
  * falling back to IP — used for per-user limits like POST /orders.
  */
-function createLimiter(options: Partial<Options> & { keyByUser?: boolean }) {
-  const { keyByUser, ...rest } = options;
+function createLimiter(options: Partial<Options> & { keyByUser?: boolean; always?: boolean }) {
+  const { keyByUser, always, ...rest } = options;
   const body: ApiErrorResponse = {
     status: 429,
     message: "Too many requests, please try again later",
@@ -20,8 +20,12 @@ function createLimiter(options: Partial<Options> & { keyByUser?: boolean }) {
     standardHeaders: true,
     legacyHeaders: false,
     message: body,
-    // ponytail: limits are for real traffic, not local dev/tests.
-    skip: () => !config.isProd,
+    // Credential endpoints are limited in every environment (a staging admin is
+    // still a real account); the rest only in production so local dev isn't
+    // throttled. Never in tests.
+    // ponytail: in-memory store, so each instance counts separately — add a
+    // Redis store (rate-limit-redis) when running more than one API instance.
+    skip: () => config.isTest || (!always && !config.isProd),
     ...(keyByUser
       ? { keyGenerator: (req: Request) => req.user?.id ?? req.ip ?? "unknown" }
       : {}),
@@ -39,6 +43,18 @@ export const globalLimiter = createLimiter({
 export const signInLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
   limit: 5,
+  always: true,
+});
+/** Refresh is called often by real clients; this only stops token guessing/replay floods. */
+export const refreshLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  always: true,
+});
+export const resetPasswordLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  always: true,
 });
 export const signUpLimiter = createLimiter({
   windowMs: 60 * 60 * 1000,
@@ -47,6 +63,7 @@ export const signUpLimiter = createLimiter({
 export const forgotPasswordLimiter = createLimiter({
   windowMs: 60 * 60 * 1000,
   limit: 3,
+  always: true,
 });
 export const searchLimiter = createLimiter({ windowMs: 60 * 1000, limit: 60 });
 export const ordersLimiter = createLimiter({
