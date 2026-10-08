@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { app, seedProduct, createUserAndSignIn, makeAdmin, bearer } from '../helpers';
-import { Order, Review, User } from '../../src/database/models';
+import { AuditLog, Order, Review, User } from '../../src/database/models';
 import { bucketKeys } from '../../src/modules/admin/admin.service';
 
 const address = { fullName: 'Layla Hassan', phone: '0501234567', address: '123 Marina Street', city: 'Dubai' };
@@ -152,5 +152,51 @@ describe('Admin reviews', () => {
     expect(list.body.data.items[0].productName).toBe('Royal Oud');
     const sum = await request(app).get('/v1/admin/reviews/summary').set(bearer(token));
     expect(sum.body.data).toEqual({ average: 4, total: 3, distribution: { 1: 0, 2: 1, 3: 0, 4: 0, 5: 2 } });
+  });
+});
+
+describe('Admin activity log', () => {
+  const seed = (over: Record<string, unknown> = {}) =>
+    AuditLog.create({
+      actorEmail: 'boss@x.com',
+      action: 'POST /v1/admin/products',
+      method: 'POST',
+      path: '/v1/admin/products',
+      statusCode: 201,
+      metadata: { body: { name: 'secret customer data' } },
+      ...over,
+    });
+
+  it('lists newest first, filters by method, text and date, and never returns request bodies', async () => {
+    const { token } = await adminToken();
+    await seed({ createdAt: new Date('2026-01-01') });
+    await seed({ method: 'DELETE', action: 'DELETE /v1/admin/tags/1', path: '/v1/admin/tags/1', actorEmail: 'ops@x.com' });
+
+    const all = await request(app).get('/v1/admin/activity').set(bearer(token));
+    expect(all.status).toBe(200);
+    // the admin's own earlier requests may also be audited; assert on our rows
+    const items = all.body.data.items as { method: string; path: string; actorEmail: string; metadata?: unknown }[];
+    expect(items.find((i) => i.path === '/v1/admin/tags/1')).toMatchObject({ method: 'DELETE', actorEmail: 'ops@x.com' });
+    expect(JSON.stringify(all.body)).not.toContain('secret customer data');
+
+    const del = await request(app).get('/v1/admin/activity').query({ method: 'DELETE' }).set(bearer(token));
+    expect(del.body.data.items.every((i: { method: string }) => i.method === 'DELETE')).toBe(true);
+
+    const byText = await request(app).get('/v1/admin/activity').query({ q: 'ops@' }).set(bearer(token));
+    expect(byText.body.data.total).toBe(1);
+
+    const old = await request(app).get('/v1/admin/activity').query({ to: '2026-01-02' }).set(bearer(token));
+    expect(old.body.data.total).toBe(1);
+
+    const literal = await request(app).get('/v1/admin/activity').query({ q: '.*' }).set(bearer(token));
+    expect(literal.body.data.total).toBe(0);
+  });
+
+  it('is admin-only: a manager gets 403', async () => {
+    const u = await createUserAndSignIn();
+    await User.updateOne({ email: u.email }, { $set: { role: 'manager' } });
+    const signIn = await request(app).post('/v1/auth/sign-in').send({ email: u.email, password: u.password });
+    const res = await request(app).get('/v1/admin/activity').set(bearer(signIn.body.data.accessToken));
+    expect(res.status).toBe(403);
   });
 });

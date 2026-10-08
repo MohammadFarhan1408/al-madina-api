@@ -12,6 +12,16 @@ import { escapeRegex } from '../../utils/escape-regex';
 import type { Paginated } from '../../types/api.types';
 import type { UserTier, NotificationKind } from '../../constants/business';
 
+export interface ActivityEntry {
+  id: string;
+  actorEmail?: string;
+  method: string;
+  path: string;
+  statusCode?: number;
+  ip?: string;
+  createdAt: Date;
+}
+
 export interface BroadcastHistoryEntry {
   id: string;
   kind: NotificationKind;
@@ -97,6 +107,50 @@ export const adminRepository = {
         tier: log.metadata?.body?.tier,
         actorEmail: log.actorEmail,
         createdAt: log.createdAt,
+      })),
+    };
+  },
+
+  // ─── Activity log ────────────────────────────────────────────────────────────
+  /** Admin mutations from the audit trail, newest first. The request body is
+   *  deliberately not returned: it can hold customer data, and the list only
+   *  needs who did what, where and when. */
+  async listActivity(
+    page: number,
+    limit: number,
+    filters: { q?: string; method?: string; from?: Date; to?: Date },
+  ): Promise<Paginated<ActivityEntry>> {
+    const filter: Record<string, unknown> = {};
+    if (filters.method) filter.method = filters.method;
+    if (filters.q) {
+      const re = new RegExp(escapeRegex(filters.q), 'i');
+      filter.$or = [{ actorEmail: re }, { path: re }];
+    }
+    if (filters.from || filters.to) {
+      filter.createdAt = {
+        ...(filters.from ? { $gte: filters.from } : {}),
+        ...(filters.to ? { $lte: filters.to } : {}),
+      };
+    }
+    const result = await paginate<{
+      _id: Types.ObjectId;
+      actorEmail?: string;
+      method: string;
+      path: string;
+      statusCode?: number;
+      ip?: string;
+      createdAt: Date;
+    }>(AuditLog, filter, { page, limit, sort: { createdAt: -1 } });
+    return {
+      ...result,
+      items: result.items.map((l) => ({
+        id: l._id.toString(),
+        actorEmail: l.actorEmail,
+        method: l.method,
+        path: l.path,
+        statusCode: l.statusCode,
+        ip: l.ip,
+        createdAt: l.createdAt,
       })),
     };
   },
