@@ -46,6 +46,16 @@ export function bucketKeys(from: Date, to: Date, granularity: 'day' | 'month'): 
   return keys;
 }
 
+/** Forward-only moves a bulk action may make. Single-order edits stay unrestricted;
+ *  a bulk click across 50 orders must not be able to reopen a delivered or
+ *  cancelled order (each move also emails/notifies the customer). */
+const BULK_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
+  processing: ['shipped', 'delivered', 'cancelled'],
+  shipped: ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
+
 export const adminService = {
   // ─── Products ──────────────────────────────────────────────────────────────
   async createProduct(data: Partial<IProduct>): Promise<IProduct> {
@@ -188,6 +198,29 @@ export const adminService = {
     // Delegates to ordersService.updateStatus, which also notifies the customer
     // (email on shipped, in-app notification, push) — see orders.service.ts.
     return ordersService.updateStatus(id, status, actorId);
+  },
+
+  /** Move many orders to one status. Each goes through the same path as a
+   *  single update (history, COD settlement, customer notification), one at a
+   *  time, and a bad row never blocks the rest: the result lists what moved and
+   *  why anything was skipped. */
+  async bulkUpdateOrderStatus(ids: string[], status: OrderStatus, actorId?: string) {
+    const updated: string[] = [];
+    const skipped: { id: string; reference?: string; reason: string }[] = [];
+    for (const id of new Set(ids)) {
+      const order = await ordersRepository.findById(id);
+      if (!order) {
+        skipped.push({ id, reason: 'Order not found' });
+      } else if (order.status === status) {
+        skipped.push({ id, reference: order.reference, reason: `Already ${status}` });
+      } else if (!BULK_TRANSITIONS[order.status].includes(status)) {
+        skipped.push({ id, reference: order.reference, reason: `A ${order.status} order cannot become ${status}` });
+      } else {
+        await ordersService.updateStatus(id, status, actorId);
+        updated.push(id);
+      }
+    }
+    return { updated, skipped };
   },
 
   orderTransactions(orderId: string) {

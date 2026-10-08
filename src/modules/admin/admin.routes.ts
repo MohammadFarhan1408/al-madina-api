@@ -16,6 +16,7 @@ import {
   collectionProductSchema,
   updateOrderStatusSchema,
   adminOrdersQuerySchema,
+  bulkOrderStatusSchema,
   dashboardSummaryQuerySchema,
   adminUsersQuerySchema,
   updateTierSchema,
@@ -60,6 +61,7 @@ router.delete('/collections/:id/products/:productId', validate({ params: objectI
 // ─── Orders ────────────────────────────────────────────────────────────────────
 router.get('/orders', validate({ query: adminOrdersQuerySchema }), asyncHandler(adminController.listOrders));
 router.get('/orders/stats', asyncHandler(adminController.orderStats));
+router.patch('/orders/status', validate({ body: bulkOrderStatusSchema }), asyncHandler(adminController.bulkUpdateOrderStatus));
 router.get('/orders/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.getOrder));
 router.patch('/orders/:id/status', validate({ params: objectIdParam(), body: updateOrderStatusSchema }), asyncHandler(adminController.updateOrderStatus));
 router.get('/orders/:id/transactions', validate({ params: objectIdParam() }), asyncHandler(adminController.orderTransactions));
