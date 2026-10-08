@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import {
   User,
   Order,
+  Product,
   AuditLog,
   ContactSubmission,
   type IUser,
@@ -158,6 +159,66 @@ export const adminRepository = {
   // ─── Contact submissions ─────────────────────────────────────────────────────
   listContactSubmissions(page: number, limit: number): Promise<Paginated<IContactSubmission>> {
     return paginate<IContactSubmission>(ContactSubmission, {}, { page, limit, sort: { createdAt: -1 } });
+  },
+
+  // ─── Global search (command palette) ────────────────────────────────────────
+  /** A handful of matches per kind — enough to jump to a record, not a result page. */
+  async search(q: string, limit = 5) {
+    const re = new RegExp(escapeRegex(q), 'i');
+    const [products, orders, customers] = await Promise.all([
+      Product.find({ deletedAt: null, $or: [{ name: re }, { brand: re }] })
+        .select('name brand images inStock')
+        .limit(limit)
+        .lean<{ _id: Types.ObjectId; name: string; brand: string; images?: string[]; inStock: boolean }[]>()
+        .exec(),
+      Order.find({
+        deletedAt: null,
+        $or: [{ reference: re }, { guestEmail: re }, { 'shippingAddress.fullName': re }],
+      })
+        .sort({ placedAt: -1 })
+        .select('reference status total currency guestEmail shippingAddress.fullName')
+        .limit(limit)
+        .lean<
+          {
+            _id: Types.ObjectId;
+            reference: string;
+            status: string;
+            total: number;
+            currency: string;
+            guestEmail?: string;
+            shippingAddress?: { fullName?: string };
+          }[]
+        >()
+        .exec(),
+      User.find({ role: 'user', $or: [{ fullName: re }, { email: re }] })
+        .select('fullName email isActive')
+        .limit(limit)
+        .lean<{ _id: Types.ObjectId; fullName: string; email: string; isActive: boolean }[]>()
+        .exec(),
+    ]);
+    return {
+      products: products.map((p) => ({
+        id: p._id.toString(),
+        name: p.name,
+        brand: p.brand,
+        image: p.images?.[0],
+        inStock: p.inStock,
+      })),
+      orders: orders.map((o) => ({
+        id: o._id.toString(),
+        reference: o.reference,
+        status: o.status,
+        total: o.total,
+        currency: o.currency,
+        customer: o.shippingAddress?.fullName ?? o.guestEmail,
+      })),
+      customers: customers.map((c) => ({
+        id: c._id.toString(),
+        fullName: c.fullName,
+        email: c.email,
+        isActive: c.isActive,
+      })),
+    };
   },
 
   // ─── Dashboard aggregations ──────────────────────────────────────────────────

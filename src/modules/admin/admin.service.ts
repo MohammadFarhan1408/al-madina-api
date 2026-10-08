@@ -331,6 +331,10 @@ export const adminService = {
     return adminRepository.listActivity(page, limit, filters);
   },
 
+  search(q: string) {
+    return adminRepository.search(q);
+  },
+
   // ─── Contact submissions ─────────────────────────────────────────────────────
   listContactSubmissions(page: number, limit: number) {
     return adminRepository.listContactSubmissions(page, limit);
