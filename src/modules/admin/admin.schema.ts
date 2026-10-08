@@ -192,3 +192,6 @@ export const adminActivityQuerySchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
 });
+
+// ─── Global search ─────────────────────────────────────────────────────────────
+export const adminSearchQuerySchema = z.object({ q: z.string().trim().min(2).max(60) });

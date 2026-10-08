@@ -25,6 +25,7 @@ import {
   adminReviewsQuerySchema,
   uploadQuerySchema,
   adminContactQuerySchema,
+  adminSearchQuerySchema,
   adminActivityQuerySchema,
 } from './admin.schema';
 import { objectIdParam } from '../../utils/common.schema';
@@ -89,6 +90,9 @@ router.post('/upload', validate({ query: uploadQuerySchema }), uploadSingle('fil
 
 // ─── Activity log — admins only (it shows what managers did, too) ────────────────
 router.get('/activity', requireRole('admin'), validate({ query: adminActivityQuerySchema }), asyncHandler(adminController.listActivity));
+
+// ─── Global search ──────────────────────────────────────────────────────────────
+router.get('/search', validate({ query: adminSearchQuerySchema }), asyncHandler(adminController.search));
 
 // ─── Contact submissions ─────────────────────────────────────────────────────────
 router.get('/contact', validate({ query: adminContactQuerySchema }), asyncHandler(adminController.listContactSubmissions));

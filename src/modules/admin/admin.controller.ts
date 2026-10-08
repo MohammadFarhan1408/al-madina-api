@@ -140,6 +140,11 @@ export const adminController = {
     sendSuccess(res, await adminService.listActivity(page, limit, filters));
   },
 
+  // Global search
+  async search(req: Request, res: Response) {
+    sendSuccess(res, await adminService.search((req.query as { q: string }).q));
+  },
+
   // Contact submissions
   async listContactSubmissions(req: Request, res: Response) {
     const { page, limit } = req.query as never as { page: number; limit: number };
