@@ -101,6 +101,11 @@ const sortOrderSchema = z.enum(['asc', 'desc']).optional().default('desc');
 
 // ─── Orders ────────────────────────────────────────────────────────────────────
 export const updateOrderStatusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
+export const MAX_BULK_ORDERS = 50;
+export const bulkOrderStatusSchema = z.object({
+  ids: z.array(objectId).min(1).max(MAX_BULK_ORDERS),
+  status: z.enum(ORDER_STATUSES),
+});
 export const adminOrdersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
   limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),

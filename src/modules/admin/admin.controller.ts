@@ -57,6 +57,9 @@ export const adminController = {
   async listOrders(req: Request, res: Response) {
     sendSuccess(res, await adminService.listOrders(req.query as never));
   },
+  async bulkUpdateOrderStatus(req: Request, res: Response) {
+    sendSuccess(res, await adminService.bulkUpdateOrderStatus(req.body.ids, req.body.status, req.user?.id));
+  },
   async getOrder(req: Request, res: Response) {
     sendSuccess(res, await adminService.getOrder(req.params.id));
   },
