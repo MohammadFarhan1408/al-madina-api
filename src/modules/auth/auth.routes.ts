@@ -12,6 +12,8 @@ import {
   signInLimiter,
   signUpLimiter,
   forgotPasswordLimiter,
+  refreshLimiter,
+  resetPasswordLimiter,
 } from '../../middlewares/rate-limit.middleware';
 import { asyncHandler } from '../../utils/async-handler';
 
@@ -39,6 +41,7 @@ router.post(
 
 router.post(
   '/refresh',
+  refreshLimiter,
   validate({ body: refreshTokenSchema }),
   asyncHandler(authController.refresh),
 );
@@ -54,6 +57,7 @@ router.post(
 
 router.post(
   '/reset-password',
+  resetPasswordLimiter,
   validate({ body: resetPasswordSchema }),
   asyncHandler(authController.resetPassword),
 );

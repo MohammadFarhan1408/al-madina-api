@@ -45,6 +45,10 @@ export class ApiError extends Error {
     return new ApiError(409, message, code, details);
   }
 
+  static tooManyRequests(message = 'Too many requests', code: ErrorCode = ERROR_CODES.RATE_LIMITED) {
+    return new ApiError(429, message, code);
+  }
+
   static unprocessable(message = 'Validation failed', details?: Record<string, unknown>) {
     return new ApiError(422, message, ERROR_CODES.VALIDATION_ERROR, details);
   }

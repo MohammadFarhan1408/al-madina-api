@@ -9,7 +9,7 @@ import {
   type IContactSubmission,
 } from '../../database/models';
 import { paginate } from '../../utils/paginate';
-import { escapeRegex } from '../../utils/escape-regex';
+import { escapeRegex } from '../../utils/sanitize';
 import type { Paginated } from '../../types/api.types';
 import type { UserTier, NotificationKind } from '../../constants/business';
 

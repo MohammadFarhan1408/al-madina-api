@@ -12,6 +12,8 @@ export interface IUser extends Document {
   memberSince: Date;
   isEmailVerified: boolean;
   isActive: boolean;
+  failedLoginCount: number;
+  lockedUntil?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +46,9 @@ const userSchema = new Schema<IUser>(
     memberSince: { type: Date, default: Date.now },
     isEmailVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true, index: true },
+    // Brute-force lockout state — never returned unless explicitly selected.
+    failedLoginCount: { type: Number, default: 0, select: false },
+    lockedUntil: { type: Date, default: null, select: false },
   },
   {
     timestamps: true,
