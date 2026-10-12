@@ -38,7 +38,14 @@ export async function paginate<T>(
   const skip = (page - 1) * limit;
 
   let query = model.find(filter).skip(skip).limit(limit);
-  if (options.sort) query = query.sort(options.sort);
+  // Always end on a unique key. Every list sorts on fields that tie (price,
+  // rating, status, placedAt, createdAt…) and MongoDB doesn't keep tied
+  // documents in a stable order between queries, so skip/limit paging could
+  // repeat a row on one page and drop another — wrong rows *and* rows that
+  // never appear on any page. `_id` makes every page deterministic.
+  const sort = { ...(options.sort ?? {}) };
+  if (!('_id' in sort)) sort._id = -1;
+  query = query.sort(sort);
   if (options.select) query = query.select(options.select);
   if (options.populate) query = query.populate(options.populate);
   if (options.lean !== false) query = query.lean();
