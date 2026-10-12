@@ -68,8 +68,13 @@ export const productsRepository = {
       if (params.maxPrice !== undefined) filter.price.$lte = params.maxPrice;
     }
 
+    // Case-insensitive substring match rather than `$text`: the text index
+    // only matches whole (stemmed) words, so a partial query like "supr" or
+    // "oud sup" returned nothing for "Oud Supreme" — and the admin list
+    // searches as the user types. Escaped, so input is never a live pattern.
     if (params.q) {
-      filter.$text = { $search: params.q };
+      const pattern = { $regex: escapeRegex(params.q), $options: 'i' };
+      filter.$or = [{ name: pattern }, { nameAr: pattern }, { brand: pattern }, { notes: pattern }];
     }
 
     return paginate<IProduct>(Product, filter, {
