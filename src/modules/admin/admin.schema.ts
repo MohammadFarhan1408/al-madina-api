@@ -166,11 +166,22 @@ export const adminContactQuerySchema = z.object({
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const MAX_SUMMARY_DAYS = 366;
 
+const isTimeZone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const dashboardSummaryQuerySchema = z
   .object({
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
     granularity: z.enum(['day', 'month']).optional().default('day'),
+    /** IANA zone the day/month buckets are cut in (the viewer's), e.g. "Europe/London". */
+    tz: z.string().trim().refine(isTimeZone, { message: 'Unknown time zone' }).optional().default('Asia/Dubai'),
   })
   .transform((q) => {
     const to = q.to ?? new Date();

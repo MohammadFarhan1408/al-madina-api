@@ -22,15 +22,15 @@ import type { UserTier, OrderStatus, PaymentStatus, NotificationKind } from '../
 import type { IProduct, ICategory, ICollection } from '../../database/models';
 import type { AuthUser } from '../../types/api.types';
 
-/** Dashboard buckets are calendar days/months in the business's timezone. */
+/** Dashboard buckets are calendar days/months in this zone unless the caller passes one. */
 const DASHBOARD_TZ = 'Asia/Dubai';
 
-const dayKey = (d: Date): string => new Intl.DateTimeFormat('en-CA', { timeZone: DASHBOARD_TZ }).format(d);
+const dayKey = (d: Date, tz: string): string => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
 
 /** Every bucket key from `from` to `to`, so a quiet day shows as 0 not a gap. */
-export function bucketKeys(from: Date, to: Date, granularity: 'day' | 'month'): string[] {
-  const [y, m, d] = dayKey(from).split('-').map(Number);
-  const end = dayKey(to);
+export function bucketKeys(from: Date, to: Date, granularity: 'day' | 'month', tz = DASHBOARD_TZ): string[] {
+  const [y, m, d] = dayKey(from, tz).split('-').map(Number);
+  const end = dayKey(to, tz);
   const keys: string[] = [];
   if (granularity === 'day') {
     for (let t = Date.UTC(y, m - 1, d); ; t += 24 * 60 * 60 * 1000) {
@@ -365,18 +365,18 @@ export const adminService = {
 
   /** Date-ranged dashboard: time series, totals, previous-period comparison,
    *  status breakdown and top products. Every figure comes from orders/users. */
-  async dashboardSummary(range: { from: Date; to: Date; granularity: 'day' | 'month' }) {
-    const { from, to, granularity } = range;
+  async dashboardSummary(range: { from: Date; to: Date; granularity: 'day' | 'month'; tz?: string }) {
+    const { from, to, granularity, tz = DASHBOARD_TZ } = range;
     const span = to.getTime() - from.getTime();
     const [agg, previous, topProducts] = await Promise.all([
-      adminRepository.summaryAggregates(from, to, granularity, DASHBOARD_TZ),
+      adminRepository.summaryAggregates(from, to, granularity, tz),
       adminRepository.rangeTotals(new Date(from.getTime() - span), from),
       adminRepository.topProducts(5, { from, to }),
     ]);
 
     const sales = new Map(agg.sales.map((r) => [r._id, r]));
     const signups = new Map(agg.signups.map((r) => [r._id, r.count]));
-    const series = bucketKeys(from, to, granularity).map((date) => ({
+    const series = bucketKeys(from, to, granularity, tz).map((date) => ({
       date,
       revenue: sales.get(date)?.revenue ?? 0,
       orders: sales.get(date)?.orders ?? 0,
@@ -389,7 +389,7 @@ export const adminService = {
     const aov = (r: number, o: number) => (o ? Math.round(r / o) : 0);
 
     return {
-      range: { from, to, granularity },
+      range: { from, to, granularity, tz },
       totals: { revenue, orders, aov: aov(revenue, orders), newCustomers: sum((p) => p.newCustomers) },
       previous: { ...previous, aov: aov(previous.revenue, previous.orders) },
       series,
