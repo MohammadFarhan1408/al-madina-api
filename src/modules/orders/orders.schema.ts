@@ -42,5 +42,10 @@ export const listOrdersQuerySchema = z.object({
   status: z.enum(ORDER_STATUSES).optional(),
 });
 
+/** ?email= on guest order lookups — matched against the order's guestEmail. */
+export const guestLookupQuerySchema = z.object({
+  email: z.string().trim().toLowerCase().email().optional(),
+});
+
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type ListOrdersQuery = z.infer<typeof listOrdersQuerySchema>;
