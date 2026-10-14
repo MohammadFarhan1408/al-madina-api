@@ -2,6 +2,7 @@ import request from 'supertest';
 import { app, seedProduct, createUserAndSignIn, makeAdmin, bearer } from '../helpers';
 import { AuditLog, Order, Review, User } from '../../src/database/models';
 import { bucketKeys } from '../../src/modules/admin/admin.service';
+import { dashboardSummaryQuerySchema } from '../../src/modules/admin/admin.schema';
 
 const address = { fullName: 'Layla Hassan', phone: '0501234567', address: '123 Marina Street', city: 'Dubai' };
 
@@ -32,6 +33,19 @@ describe('bucketKeys', () => {
     expect(bucketKeys(new Date('2026-01-15T00:00:00Z'), new Date('2026-03-02T00:00:00Z'), 'month')).toEqual([
       '2026-01', '2026-02', '2026-03',
     ]);
+  });
+
+  it('cuts days in the requested time zone', () => {
+    // 22:00 UTC is already the next day in Dubai, still the same day in New York.
+    const from = new Date('2026-01-01T22:00:00Z');
+    const to = new Date('2026-01-02T22:00:00Z');
+    expect(bucketKeys(from, to, 'day')).toEqual(['2026-01-02', '2026-01-03']);
+    expect(bucketKeys(from, to, 'day', 'America/New_York')).toEqual(['2026-01-01', '2026-01-02']);
+  });
+
+  it('rejects an unknown time zone', () => {
+    expect(dashboardSummaryQuerySchema.safeParse({ tz: 'Mars/Olympus' }).success).toBe(false);
+    expect(dashboardSummaryQuerySchema.parse({}).tz).toBe('Asia/Dubai');
   });
 });
 
