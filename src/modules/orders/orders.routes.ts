@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ordersController } from './orders.controller';
-import { createOrderSchema, listOrdersQuerySchema } from './orders.schema';
+import { createOrderSchema, guestLookupQuerySchema, listOrdersQuerySchema } from './orders.schema';
 import { retryPaymentSchema } from '../payments/payments.schema';
 import { objectIdParam } from '../../utils/common.schema';
 import { validate, requireAuth, authOptional } from '../../middlewares';
@@ -25,7 +25,7 @@ router.get(
   '/:id',
   authOptional,
   orderLookupLimiter,
-  validate({ params: objectIdParam() }),
+  validate({ params: objectIdParam(), query: guestLookupQuerySchema }),
   asyncHandler(ordersController.getById),
 );
 
@@ -33,14 +33,15 @@ router.get(
   '/:id/payments',
   authOptional,
   orderLookupLimiter,
-  validate({ params: objectIdParam() }),
+  validate({ params: objectIdParam(), query: guestLookupQuerySchema }),
   asyncHandler(ordersController.listPayments),
 );
 
 router.post(
   '/:id/payments/retry',
   authOptional,
-  validate({ params: objectIdParam(), body: retryPaymentSchema }),
+  orderLookupLimiter,
+  validate({ params: objectIdParam(), query: guestLookupQuerySchema, body: retryPaymentSchema }),
   asyncHandler(ordersController.retryPayment),
 );
 

@@ -70,3 +70,27 @@ describe('Sign-in hardening', () => {
     ]);
   });
 });
+
+describe('Coupon percentage cap', () => {
+  it('rejects a percentage over 100 on create and when only the value is patched', async () => {
+    const u = await createUserAndSignIn();
+    const token = await makeAdmin(u.email, u.password);
+    const base = { code: 'CAP50', description: 'Half off', discountType: 'percentage', expiresAt: '2099-01-01' };
+
+    expect((await request(app).post('/v1/admin/coupons').set(bearer(token)).send({ ...base, value: 150 })).status).toBe(400);
+
+    const created = await request(app).post('/v1/admin/coupons').set(bearer(token)).send({ ...base, value: 50 });
+    expect(created.status).toBe(201);
+    const patch = (body: object) =>
+      request(app).patch(`/v1/admin/coupons/${created.body.data.id}`).set(bearer(token)).send(body);
+    expect((await patch({ value: 150 })).status).toBe(400);
+    expect((await patch({ discountType: 'fixed', value: 150 })).status).toBe(200);
+  });
+});
+
+describe('Guest order lookup', () => {
+  it('rejects a malformed ?email=', async () => {
+    const res = await request(app).get('/v1/orders/64f1a2b3c4d5e6f7a8b9c0d1?email=not-an-email');
+    expect(res.status).toBe(422);
+  });
+});

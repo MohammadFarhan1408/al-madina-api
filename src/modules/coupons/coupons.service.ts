@@ -3,6 +3,13 @@ import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
 import type { ICoupon } from '../../database/models';
 
+/** A percentage coupon over 100% would make the order total negative. */
+function assertPercentageInRange(discountType?: string, value?: number) {
+  if (discountType === 'percentage' && value !== undefined && value > 100) {
+    throw ApiError.badRequest('A percentage discount cannot exceed 100', ERROR_CODES.VALIDATION_ERROR);
+  }
+}
+
 export const couponsService = {
   listAll(page: number, limit: number, isActive?: boolean) {
     return couponsRepository.listAll(page, limit, isActive);
@@ -15,6 +22,7 @@ export const couponsService = {
   },
 
   async create(data: Partial<ICoupon>): Promise<ICoupon> {
+    assertPercentageInRange(data.discountType, data.value);
     if (data.code && (await couponsRepository.findByCode(data.code))) {
       throw ApiError.conflict('Coupon code already exists', ERROR_CODES.COUPON_CODE_TAKEN);
     }
@@ -28,6 +36,12 @@ export const couponsService = {
         throw ApiError.conflict('Coupon code already exists', ERROR_CODES.COUPON_CODE_TAKEN);
       }
     }
+    if (data.value !== undefined || data.discountType !== undefined) {
+      // Either half may be changing alone; check against the stored other half.
+      const current = await couponsRepository.findById(id);
+      if (!current) throw ApiError.notFound('Coupon not found', ERROR_CODES.COUPON_NOT_FOUND);
+      assertPercentageInRange(data.discountType ?? current.discountType, data.value ?? current.value);
+    }
     const coupon = await couponsRepository.update(id, data);
     if (!coupon) throw ApiError.notFound('Coupon not found', ERROR_CODES.COUPON_NOT_FOUND);
     return coupon;
@@ -38,11 +52,7 @@ export const couponsService = {
     if (!coupon) throw ApiError.notFound('Coupon not found', ERROR_CODES.COUPON_NOT_FOUND);
   },
 
-  /**
-   * Validate a coupon for redemption against a subtotal. Used by seed data
-   * and available for future checkout-time integration (not wired into
-   * orders.service yet — see AGENTS.md / plan scope).
-   */
+  /** Validate a coupon for redemption against a subtotal (POST /coupons/validate and order creation). */
   async validateForSubtotal(code: string, subtotal: number): Promise<ICoupon> {
     const coupon = await couponsRepository.findByCode(code);
     if (!coupon) throw ApiError.notFound('Coupon not found', ERROR_CODES.COUPON_NOT_FOUND);
