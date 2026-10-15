@@ -16,16 +16,16 @@ export interface PublicUser {
 }
 
 /** Result of a successful sign-up / sign-in. */
-export interface AuthResult {
+export interface AuthResult extends TokenPair {
   user: PublicUser;
-  accessToken: string;
-  refreshToken: string;
 }
 
 /** Result of a token refresh (rotated pair). */
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
+  /** When the refresh token stops working — the admin sizes its cookie to this. */
+  refreshExpiresAt: Date;
 }
 
 /** Maps a User document to the public-safe shape. */

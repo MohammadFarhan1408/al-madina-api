@@ -11,7 +11,7 @@ export const authController = {
   },
 
   async signIn(req: Request, res: Response): Promise<void> {
-    const result = await authService.signIn(req.body);
+    const result = await authService.signIn(req.body, { ip: req.ip });
     sendSuccess(res, result);
   },
 

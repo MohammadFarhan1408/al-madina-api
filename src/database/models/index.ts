@@ -13,6 +13,7 @@ export {
   type IOrder,
   type IOrderItem,
   type IShippingAddress,
+  type IStatusChange,
 } from './order.model';
 export { Notification, type INotification } from './notification.model';
 export { ContactSubmission, type IContactSubmission } from './contact-submission.model';

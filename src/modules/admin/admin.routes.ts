@@ -16,6 +16,8 @@ import {
   collectionProductSchema,
   updateOrderStatusSchema,
   adminOrdersQuerySchema,
+  bulkOrderStatusSchema,
+  dashboardSummaryQuerySchema,
   adminUsersQuerySchema,
   updateTierSchema,
   broadcastSchema,
@@ -23,6 +25,8 @@ import {
   adminReviewsQuerySchema,
   uploadQuerySchema,
   adminContactQuerySchema,
+  adminSearchQuerySchema,
+  adminActivityQuerySchema,
 } from './admin.schema';
 import { objectIdParam } from '../../utils/common.schema';
 import { validate, requireAuth, requireRole, auditLog } from '../../middlewares';
@@ -36,6 +40,7 @@ router.use(requireAuth, requireRole('admin', 'manager'), auditLog);
 
 // ─── Dashboard & stats ───────────────────────────────────────────────────────
 router.get('/dashboard', asyncHandler(adminController.dashboard));
+router.get('/dashboard/summary', validate({ query: dashboardSummaryQuerySchema }), asyncHandler(adminController.dashboardSummary));
 
 // ─── Products ──────────────────────────────────────────────────────────────────
 router.post('/products', validate({ body: createProductSchema }), asyncHandler(adminController.createProduct));
@@ -53,11 +58,13 @@ router.post('/collections', validate({ body: createCollectionSchema }), asyncHan
 router.patch('/collections/:id', validate({ params: objectIdParam(), body: updateCollectionSchema }), asyncHandler(adminController.updateCollection));
 router.delete('/collections/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.deleteCollection));
 router.post('/collections/:id/products', validate({ params: objectIdParam(), body: collectionProductSchema }), asyncHandler(adminController.addCollectionProduct));
-router.delete('/collections/:id/products/:productId', validate({ params: objectIdParam() }), asyncHandler(adminController.removeCollectionProduct));
+router.delete('/collections/:id/products/:productId', validate({ params: objectIdParam().merge(objectIdParam('productId')) }), asyncHandler(adminController.removeCollectionProduct));
 
 // ─── Orders ────────────────────────────────────────────────────────────────────
 router.get('/orders', validate({ query: adminOrdersQuerySchema }), asyncHandler(adminController.listOrders));
 router.get('/orders/stats', asyncHandler(adminController.orderStats));
+router.patch('/orders/status', validate({ body: bulkOrderStatusSchema }), asyncHandler(adminController.bulkUpdateOrderStatus));
+router.get('/orders/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.getOrder));
 router.patch('/orders/:id/status', validate({ params: objectIdParam(), body: updateOrderStatusSchema }), asyncHandler(adminController.updateOrderStatus));
 router.get('/orders/:id/transactions', validate({ params: objectIdParam() }), asyncHandler(adminController.orderTransactions));
 router.post('/orders/:id/payments/refund', validate({ params: objectIdParam(), body: refundPaymentSchema }), asyncHandler(adminController.refundPayment));
@@ -67,6 +74,7 @@ router.get('/users', validate({ query: adminUsersQuerySchema }), asyncHandler(ad
 router.get('/users/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.getUser));
 router.patch('/users/:id/tier', validate({ params: objectIdParam(), body: updateTierSchema }), asyncHandler(adminController.updateUserTier));
 router.delete('/users/:id', validate({ params: objectIdParam() }), asyncHandler(adminController.deactivateUser));
+router.post('/users/:id/reactivate', validate({ params: objectIdParam() }), asyncHandler(adminController.reactivateUser));
 
 // ─── Notifications broadcast ─────────────────────────────────────────────────────
 router.get('/notifications', validate({ query: notificationHistoryQuerySchema }), asyncHandler(adminController.notificationHistory));
@@ -74,10 +82,17 @@ router.post('/notifications', validate({ body: broadcastSchema }), asyncHandler(
 
 // ─── Reviews ───────────────────────────────────────────────────────────────────
 router.get('/reviews', validate({ query: adminReviewsQuerySchema }), asyncHandler(reviewsController.listAll));
+router.get('/reviews/summary', asyncHandler(reviewsController.summary));
 router.delete('/reviews/:id', validate({ params: objectIdParam() }), asyncHandler(reviewsController.remove));
 
 // ─── Upload ────────────────────────────────────────────────────────────────────
 router.post('/upload', validate({ query: uploadQuerySchema }), uploadSingle('file'), asyncHandler(adminController.upload));
+
+// ─── Activity log — admins only (it shows what managers did, too) ────────────────
+router.get('/activity', requireRole('admin'), validate({ query: adminActivityQuerySchema }), asyncHandler(adminController.listActivity));
+
+// ─── Global search ──────────────────────────────────────────────────────────────
+router.get('/search', validate({ query: adminSearchQuerySchema }), asyncHandler(adminController.search));
 
 // ─── Contact submissions ─────────────────────────────────────────────────────────
 router.get('/contact', validate({ query: adminContactQuerySchema }), asyncHandler(adminController.listContactSubmissions));

@@ -10,6 +10,7 @@ import { ordersService } from '../orders/orders.service';
 import { paymentsService } from '../payments/payments.service';
 import { notificationsRepository } from '../notifications/notifications.repository';
 import { addressesRepository } from '../addresses/addresses.repository';
+import { authRepository } from '../auth/auth.repository';
 import { User, Cart, UserPreference } from '../../database/models';
 import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
@@ -17,8 +18,59 @@ import { uploadToCloudinary, type UploadType } from '../../storage/upload';
 import { queuePush } from '../../jobs/queues/push.queue';
 import { slugify } from '../../utils/slugify';
 import { Types } from 'mongoose';
-import type { UserTier, OrderStatus, NotificationKind } from '../../constants/business';
+import type { UserTier, OrderStatus, PaymentStatus, NotificationKind } from '../../constants/business';
 import type { IProduct, ICategory, ICollection } from '../../database/models';
+import type { AuthUser } from '../../types/api.types';
+
+/** Dashboard buckets are calendar days/months in this zone unless the caller passes one. */
+const DASHBOARD_TZ = 'Asia/Dubai';
+
+const dayKey = (d: Date, tz: string): string => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
+
+/** Every bucket key from `from` to `to`, so a quiet day shows as 0 not a gap. */
+export function bucketKeys(from: Date, to: Date, granularity: 'day' | 'month', tz = DASHBOARD_TZ): string[] {
+  const [y, m, d] = dayKey(from, tz).split('-').map(Number);
+  const end = dayKey(to, tz);
+  const keys: string[] = [];
+  if (granularity === 'day') {
+    for (let t = Date.UTC(y, m - 1, d); ; t += 24 * 60 * 60 * 1000) {
+      const k = new Date(t).toISOString().slice(0, 10);
+      keys.push(k);
+      if (k >= end) break;
+    }
+  } else {
+    for (let i = 0; ; i++) {
+      const k = new Date(Date.UTC(y, m - 1 + i, 1)).toISOString().slice(0, 7);
+      keys.push(k);
+      if (k >= end.slice(0, 7)) break;
+    }
+  }
+  return keys;
+}
+
+/** Forward-only moves a bulk action may make. Single-order edits stay unrestricted;
+ *  a bulk click across 50 orders must not be able to reopen a delivered or
+ *  cancelled order (each move also emails/notifies the customer). */
+const BULK_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
+  processing: ['shipped', 'delivered', 'cancelled'],
+  shipped: ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
+
+/** Who may change another account: nobody changes their own (no locking yourself
+ *  out, no self-promotion of tier), and only an admin may change an admin. */
+async function assertCanManage(actor: AuthUser, targetId: string) {
+  if (actor.id === targetId) {
+    throw ApiError.badRequest('You cannot change your own account here', ERROR_CODES.BAD_REQUEST);
+  }
+  const target = await adminRepository.findUserById(targetId);
+  if (!target) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
+  if (target.role === 'admin' && actor.role !== 'admin') {
+    throw ApiError.forbidden('Only an admin can change an admin account', ERROR_CODES.FORBIDDEN);
+  }
+  return target;
+}
 
 export const adminService = {
   // ─── Products ──────────────────────────────────────────────────────────────
@@ -127,6 +179,8 @@ export const adminService = {
     page: number;
     limit: number;
     status?: OrderStatus;
+    paymentStatus?: PaymentStatus;
+    q?: string;
     from?: Date;
     to?: Date;
     sortBy?: 'reference' | 'placedAt' | 'total' | 'status';
@@ -134,6 +188,8 @@ export const adminService = {
   }) {
     return ordersRepository.listAll(query.page, query.limit, {
       status: query.status,
+      paymentStatus: query.paymentStatus,
+      q: query.q,
       from: query.from,
       to: query.to,
       sortBy: query.sortBy,
@@ -141,10 +197,46 @@ export const adminService = {
     });
   },
 
-  async updateOrderStatus(id: string, status: OrderStatus) {
+  /** Order plus its customer (name/email), for the admin detail page. */
+  async getOrder(id: string) {
+    const order = await ordersRepository.findById(id);
+    if (!order) throw ApiError.notFound('Order not found', ERROR_CODES.ORDER_NOT_FOUND);
+    const customer = order.userId
+      ? await User.findById(order.userId).select('fullName email avatar').lean().exec()
+      : null;
+    return {
+      ...order.toJSON(),
+      customer: customer ? { id: String(customer._id), fullName: customer.fullName, email: customer.email } : null,
+    };
+  },
+
+  async updateOrderStatus(id: string, status: OrderStatus, actorId?: string) {
     // Delegates to ordersService.updateStatus, which also notifies the customer
     // (email on shipped, in-app notification, push) — see orders.service.ts.
-    return ordersService.updateStatus(id, status);
+    return ordersService.updateStatus(id, status, actorId);
+  },
+
+  /** Move many orders to one status. Each goes through the same path as a
+   *  single update (history, COD settlement, customer notification), one at a
+   *  time, and a bad row never blocks the rest: the result lists what moved and
+   *  why anything was skipped. */
+  async bulkUpdateOrderStatus(ids: string[], status: OrderStatus, actorId?: string) {
+    const updated: string[] = [];
+    const skipped: { id: string; reference?: string; reason: string }[] = [];
+    for (const id of new Set(ids)) {
+      const order = await ordersRepository.findById(id);
+      if (!order) {
+        skipped.push({ id, reason: 'Order not found' });
+      } else if (order.status === status) {
+        skipped.push({ id, reference: order.reference, reason: `Already ${status}` });
+      } else if (!BULK_TRANSITIONS[order.status].includes(status)) {
+        skipped.push({ id, reference: order.reference, reason: `A ${order.status} order cannot become ${status}` });
+      } else {
+        await ordersService.updateStatus(id, status, actorId);
+        updated.push(id);
+      }
+    }
+    return { updated, skipped };
   },
 
   orderTransactions(orderId: string) {
@@ -164,7 +256,7 @@ export const adminService = {
   },
 
   // ─── Customers ───────────────────────────────────────────────────────────────
-  listUsers(
+  async listUsers(
     page: number,
     limit: number,
     tier?: UserTier,
@@ -172,7 +264,10 @@ export const adminService = {
     sortOrder?: 'asc' | 'desc',
     q?: string,
   ) {
-    return adminRepository.listUsers(page, limit, tier, sortBy, sortOrder, q);
+    const result = await adminRepository.listUsers(page, limit, tier, sortBy, sortOrder, q);
+    const stats = await adminRepository.orderStatsByUser(result.items.map((u) => u._id));
+    const none = { orderCount: 0, totalSpent: 0 };
+    return { ...result, items: result.items.map((u) => ({ ...u, ...(stats.get(String(u._id)) ?? none) })) };
   },
 
   async getUser(id: string) {
@@ -183,18 +278,29 @@ export const adminService = {
       addressesRepository.listForUserAdmin(id),
       Cart.findOne({ userId: id }).populate('items.productId').lean().exec(),
     ]);
-    return { user, recentOrders: orders.items, addresses, cart: cart?.items ?? [] };
+    const stats = (await adminRepository.orderStatsByUser([user._id])).get(id) ?? { orderCount: 0, totalSpent: 0 };
+    return { user, stats, recentOrders: orders.items, addresses, cart: cart?.items ?? [] };
   },
 
-  async updateUserTier(id: string, tier: UserTier) {
+  async updateUserTier(actor: AuthUser, id: string, tier: UserTier) {
+    await assertCanManage(actor, id);
     const user = await adminRepository.updateTier(id, tier);
     if (!user) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
     return user;
   },
 
-  async deactivateUser(id: string): Promise<void> {
+  async reactivateUser(actor: AuthUser, id: string): Promise<void> {
+    await assertCanManage(actor, id);
+    const user = await adminRepository.reactivate(id);
+    if (!user) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
+  },
+
+  async deactivateUser(actor: AuthUser, id: string): Promise<void> {
+    await assertCanManage(actor, id);
     const user = await adminRepository.deactivate(id);
     if (!user) throw ApiError.notFound('User not found', ERROR_CODES.USER_NOT_FOUND);
+    // End every session now, not when the refresh token would have expired.
+    await authRepository.revokeAllRefreshTokensForUser(user._id);
   },
 
   // ─── Notifications broadcast ─────────────────────────────────────────────────
@@ -237,12 +343,61 @@ export const adminService = {
     return uploadToCloudinary(file, type);
   },
 
+  // ─── Activity log ────────────────────────────────────────────────────────────
+  listActivity(
+    page: number,
+    limit: number,
+    filters: { q?: string; method?: string; from?: Date; to?: Date },
+  ) {
+    return adminRepository.listActivity(page, limit, filters);
+  },
+
+  search(q: string) {
+    return adminRepository.search(q);
+  },
+
   // ─── Contact submissions ─────────────────────────────────────────────────────
   listContactSubmissions(page: number, limit: number) {
     return adminRepository.listContactSubmissions(page, limit);
   },
 
   // ─── Dashboard ───────────────────────────────────────────────────────────────
+
+  /** Date-ranged dashboard: time series, totals, previous-period comparison,
+   *  status breakdown and top products. Every figure comes from orders/users. */
+  async dashboardSummary(range: { from: Date; to: Date; granularity: 'day' | 'month'; tz?: string }) {
+    const { from, to, granularity, tz = DASHBOARD_TZ } = range;
+    const span = to.getTime() - from.getTime();
+    const [agg, previous, topProducts] = await Promise.all([
+      adminRepository.summaryAggregates(from, to, granularity, tz),
+      adminRepository.rangeTotals(new Date(from.getTime() - span), from),
+      adminRepository.topProducts(5, { from, to }),
+    ]);
+
+    const sales = new Map(agg.sales.map((r) => [r._id, r]));
+    const signups = new Map(agg.signups.map((r) => [r._id, r.count]));
+    const series = bucketKeys(from, to, granularity, tz).map((date) => ({
+      date,
+      revenue: sales.get(date)?.revenue ?? 0,
+      orders: sales.get(date)?.orders ?? 0,
+      newCustomers: signups.get(date) ?? 0,
+    }));
+
+    const sum = (f: (p: (typeof series)[number]) => number) => series.reduce((a, p) => a + f(p), 0);
+    const revenue = sum((p) => p.revenue);
+    const orders = sum((p) => p.orders);
+    const aov = (r: number, o: number) => (o ? Math.round(r / o) : 0);
+
+    return {
+      range: { from, to, granularity, tz },
+      totals: { revenue, orders, aov: aov(revenue, orders), newCustomers: sum((p) => p.newCustomers) },
+      previous: { ...previous, aov: aov(previous.revenue, previous.orders) },
+      series,
+      ordersByStatus: Object.fromEntries(agg.statuses.map((r) => [r._id, r.count])),
+      topProducts,
+    };
+  },
+
   async dashboard() {
     const dayMs = 24 * 60 * 60 * 1000;
     const now = Date.now();

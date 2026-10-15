@@ -5,6 +5,7 @@ import {
   PRODUCT_BADGES,
   COLLECTION_ACCENTS,
   ORDER_STATUSES,
+  PAYMENT_STATUSES,
   USER_TIERS,
   NOTIFICATION_KINDS,
   PRODUCT_VARIANT_SIZES_ML,
@@ -100,10 +101,17 @@ const sortOrderSchema = z.enum(['asc', 'desc']).optional().default('desc');
 
 // ─── Orders ────────────────────────────────────────────────────────────────────
 export const updateOrderStatusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
+export const MAX_BULK_ORDERS = 50;
+export const bulkOrderStatusSchema = z.object({
+  ids: z.array(objectId).min(1).max(MAX_BULK_ORDERS),
+  status: z.enum(ORDER_STATUSES),
+});
 export const adminOrdersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
   limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
   status: z.enum(ORDER_STATUSES).optional(),
+  paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
+  q: z.string().trim().min(1).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   sortBy: z.enum(['reference', 'placedAt', 'total', 'status']).optional().default('placedAt'),
@@ -153,3 +161,48 @@ export const adminContactQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
   limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
 });
+
+// ─── Dashboard summary ─────────────────────────────────────────────────────────
+const DAY_MS = 24 * 60 * 60 * 1000;
+export const MAX_SUMMARY_DAYS = 366;
+
+const isTimeZone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const dashboardSummaryQuerySchema = z
+  .object({
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+    granularity: z.enum(['day', 'month']).optional().default('day'),
+    /** IANA zone the day/month buckets are cut in (the viewer's), e.g. "Europe/London". */
+    tz: z.string().trim().refine(isTimeZone, { message: 'Unknown time zone' }).optional().default('Asia/Dubai'),
+  })
+  .transform((q) => {
+    const to = q.to ?? new Date();
+    return { ...q, to, from: q.from ?? new Date(to.getTime() - 30 * DAY_MS) };
+  })
+  .refine((q) => q.from < q.to, { message: '`from` must be before `to`', path: ['from'] })
+  .refine((q) => q.to.getTime() - q.from.getTime() <= MAX_SUMMARY_DAYS * DAY_MS, {
+    message: `Range cannot exceed ${MAX_SUMMARY_DAYS} days`,
+    path: ['from'],
+  });
+
+// ─── Activity log ──────────────────────────────────────────────────────────────
+export const adminActivityQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
+  limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
+  /** Matches the actor's email or the request path. */
+  q: z.string().trim().min(1).optional(),
+  method: z.enum(['POST', 'PATCH', 'PUT', 'DELETE']).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
+// ─── Global search ─────────────────────────────────────────────────────────────
+export const adminSearchQuerySchema = z.object({ q: z.string().trim().min(2).max(60) });

@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import {
   User,
+  AuditLog,
   RefreshToken,
   PasswordResetToken,
   UserPreference,
@@ -17,9 +18,43 @@ export const authRepository = {
     return User.findOne({ email: email.toLowerCase() }).exec();
   },
 
-  /** Includes the normally-hidden passwordHash for credential checks. */
+  /** Includes the normally-hidden passwordHash and lockout state for credential checks. */
   findByEmailWithPassword(email: string): Promise<IUser | null> {
-    return User.findOne({ email: email.toLowerCase() }).select('+passwordHash').exec();
+    return User.findOne({ email: email.toLowerCase() })
+      .select('+passwordHash +failedLoginCount +lockedUntil')
+      .exec();
+  },
+
+  // ─── Brute-force lockout ───────────────────────────────────────────────────
+
+  /** Count a failed sign-in atomically; returns the new count. */
+  async recordFailedLogin(userId: Types.ObjectId): Promise<number> {
+    const user = await User.findByIdAndUpdate(userId, { $inc: { failedLoginCount: 1 } }, { new: true })
+      .select('+failedLoginCount')
+      .lean<{ failedLoginCount: number }>()
+      .exec();
+    return user?.failedLoginCount ?? 0;
+  },
+
+  async lockAccount(userId: Types.ObjectId, until: Date): Promise<void> {
+    await User.updateOne({ _id: userId }, { $set: { lockedUntil: until, failedLoginCount: 0 } }).exec();
+  },
+
+  async clearFailedLogins(userId: Types.ObjectId): Promise<void> {
+    await User.updateOne({ _id: userId }, { $set: { failedLoginCount: 0, lockedUntil: null } }).exec();
+  },
+
+  /** Staff sign-in attempts go into the audit trail (the admin Activity page). */
+  async recordSignIn(user: IUser, ip: string | undefined, statusCode: number): Promise<void> {
+    await AuditLog.create({
+      actorId: user._id,
+      actorEmail: user.email,
+      action: 'POST /v1/auth/sign-in',
+      method: 'POST',
+      path: '/v1/auth/sign-in',
+      ip,
+      statusCode,
+    });
   },
 
   findById(id: string): Promise<IUser | null> {
@@ -48,8 +83,26 @@ export const authRepository = {
 
   // ─── Refresh tokens ────────────────────────────────────────────────────────
 
-  createRefreshToken(userId: Types.ObjectId, tokenHash: string, expiresAt: Date): Promise<IRefreshToken> {
-    return RefreshToken.create({ userId, token: tokenHash, expiresAt });
+  createRefreshToken(
+    userId: Types.ObjectId,
+    tokenHash: string,
+    expiresAt: Date,
+    session: { familyId: string; sessionExpiresAt?: Date },
+  ): Promise<IRefreshToken> {
+    return RefreshToken.create({ userId, token: tokenHash, expiresAt, ...session });
+  },
+
+  /** Spend a live refresh token in one atomic step, so two concurrent refreshes
+   *  with the same token can't both succeed. Returns the token as it was before. */
+  consumeRefreshToken(tokenHash: string): Promise<IRefreshToken | null> {
+    return RefreshToken.findOneAndUpdate(
+      { token: tokenHash, revokedAt: null, expiresAt: { $gt: new Date() } },
+      { $set: { revokedAt: new Date() } },
+    ).exec();
+  },
+
+  async revokeRefreshTokenFamily(familyId: string): Promise<void> {
+    await RefreshToken.updateMany({ familyId, revokedAt: null }, { $set: { revokedAt: new Date() } }).exec();
   },
 
   findRefreshToken(tokenHash: string): Promise<IRefreshToken | null> {

@@ -57,8 +57,14 @@ export const adminController = {
   async listOrders(req: Request, res: Response) {
     sendSuccess(res, await adminService.listOrders(req.query as never));
   },
+  async bulkUpdateOrderStatus(req: Request, res: Response) {
+    sendSuccess(res, await adminService.bulkUpdateOrderStatus(req.body.ids, req.body.status, req.user?.id));
+  },
+  async getOrder(req: Request, res: Response) {
+    sendSuccess(res, await adminService.getOrder(req.params.id));
+  },
   async updateOrderStatus(req: Request, res: Response) {
-    sendSuccess(res, await adminService.updateOrderStatus(req.params.id, req.body.status));
+    sendSuccess(res, await adminService.updateOrderStatus(req.params.id, req.body.status, req.user?.id));
   },
   async orderStats(_req: Request, res: Response) {
     sendSuccess(res, await adminService.orderStats());
@@ -86,10 +92,14 @@ export const adminController = {
     sendSuccess(res, await adminService.getUser(req.params.id));
   },
   async updateUserTier(req: Request, res: Response) {
-    sendSuccess(res, await adminService.updateUserTier(req.params.id, req.body.tier));
+    sendSuccess(res, await adminService.updateUserTier(req.user!, req.params.id, req.body.tier));
+  },
+  async reactivateUser(req: Request, res: Response) {
+    await adminService.reactivateUser(req.user!, req.params.id);
+    sendSuccess(res, null, 200, 'User reactivated');
   },
   async deactivateUser(req: Request, res: Response) {
-    await adminService.deactivateUser(req.params.id);
+    await adminService.deactivateUser(req.user!, req.params.id);
     sendSuccess(res, null, 200, 'User deactivated');
   },
 
@@ -112,6 +122,27 @@ export const adminController = {
   // Dashboard
   async dashboard(_req: Request, res: Response) {
     sendSuccess(res, await adminService.dashboard());
+  },
+  async dashboardSummary(req: Request, res: Response) {
+    sendSuccess(res, await adminService.dashboardSummary(req.query as never));
+  },
+
+  // Activity log
+  async listActivity(req: Request, res: Response) {
+    const { page, limit, ...filters } = req.query as never as {
+      page: number;
+      limit: number;
+      q?: string;
+      method?: string;
+      from?: Date;
+      to?: Date;
+    };
+    sendSuccess(res, await adminService.listActivity(page, limit, filters));
+  },
+
+  // Global search
+  async search(req: Request, res: Response) {
+    sendSuccess(res, await adminService.search((req.query as { q: string }).q));
   },
 
   // Contact submissions

@@ -30,12 +30,20 @@ export interface IShippingAddress {
   city: string;
 }
 
+/** One entry per status the order has held — the timeline shown in admin. */
+export interface IStatusChange {
+  status: OrderStatus;
+  at: Date;
+  by?: Types.ObjectId | null;
+}
+
 export interface IOrder extends Document {
   _id: Types.ObjectId;
   reference: string;
   userId?: Types.ObjectId | null;
   guestEmail?: string;
   status: OrderStatus;
+  statusHistory: IStatusChange[];
   shippingAddress: IShippingAddress;
   deliveryMethod: DeliveryMethod;
   paymentMethod: PaymentMethod;
@@ -76,6 +84,15 @@ const shippingAddressSchema = new Schema<IShippingAddress>(
   { _id: false },
 );
 
+const statusChangeSchema = new Schema<IStatusChange>(
+  {
+    status: { type: String, enum: ORDER_STATUSES, required: true },
+    at: { type: Date, default: Date.now },
+    by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  },
+  { _id: false },
+);
+
 const orderSchema = new Schema<IOrder>(
   {
     reference: { type: String, required: true, unique: true, index: true },
@@ -83,6 +100,8 @@ const orderSchema = new Schema<IOrder>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     guestEmail: { type: String, lowercase: true, trim: true },
     status: { type: String, enum: ORDER_STATUSES, default: 'processing', index: true },
+    // Orders placed before this field existed simply have an empty history.
+    statusHistory: { type: [statusChangeSchema], default: [] },
     shippingAddress: { type: shippingAddressSchema, required: true },
     deliveryMethod: { type: String, enum: DELIVERY_METHODS, required: true },
     paymentMethod: { type: String, enum: PAYMENT_METHODS, required: true },

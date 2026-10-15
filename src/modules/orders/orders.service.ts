@@ -175,8 +175,8 @@ export const ordersService = {
     });
   },
 
-  async updateStatus(id: string, status: OrderStatus): Promise<IOrder> {
-    let order = await ordersRepository.updateStatus(id, status);
+  async updateStatus(id: string, status: OrderStatus, actorId?: string): Promise<IOrder> {
+    let order = await ordersRepository.updateStatus(id, status, actorId);
     if (!order) {
       throw ApiError.notFound('Order not found', ERROR_CODES.ORDER_NOT_FOUND);
     }
