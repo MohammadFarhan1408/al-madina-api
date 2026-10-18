@@ -25,7 +25,8 @@ async function settleOrderPaid(order: IOrder): Promise<void> {
 }
 
 /** Hosted gateways send the customer back here; guests need ?email= to view. */
-function returnUrlFor(order: IOrder): string {
+function returnUrlFor(order: IOrder, appReturnUrl?: string): string {
+  if (appReturnUrl) return appReturnUrl;
   const q = order.guestEmail ? `?email=${encodeURIComponent(order.guestEmail)}` : '';
   return `${config.clientUrl}/order/${order._id}${q}`;
 }
@@ -34,7 +35,7 @@ export const paymentsService = {
   /** Creates the first transaction for a freshly-created order. Idempotent on
    * `idempotencyKey` — a retried request with the same key returns the
    * existing transaction instead of charging twice. */
-  async initiateForOrder(order: IOrder, idempotencyKey: string): Promise<ITransaction> {
+  async initiateForOrder(order: IOrder, idempotencyKey: string, appReturnUrl?: string): Promise<ITransaction> {
     const existing = await paymentsRepository.findByIdempotencyKey(idempotencyKey);
     if (existing) return existing;
 
@@ -45,7 +46,7 @@ export const paymentsService = {
       currency: order.currency,
       idempotencyKey,
       reference: order.reference,
-      returnUrl: returnUrlFor(order),
+      returnUrl: returnUrlFor(order, appReturnUrl),
     });
 
     const transaction = await paymentsRepository.create({
@@ -65,7 +66,7 @@ export const paymentsService = {
 
   /** POST /orders/:id/payments/retry — only when the latest attempt failed or
    * was cancelled; creates a new Transaction, preserving attempt history. */
-  async retryPayment(orderId: string, idempotencyKey: string): Promise<ITransaction> {
+  async retryPayment(orderId: string, idempotencyKey: string, appReturnUrl?: string): Promise<ITransaction> {
     const order = await ordersRepository.findById(orderId);
     if (!order) throw ApiError.notFound('Order not found', ERROR_CODES.ORDER_NOT_FOUND);
 
@@ -87,7 +88,7 @@ export const paymentsService = {
       currency: order.currency,
       idempotencyKey,
       reference: order.reference,
-      returnUrl: returnUrlFor(order),
+      returnUrl: returnUrlFor(order, appReturnUrl),
     });
 
     const transaction = await paymentsRepository.create({

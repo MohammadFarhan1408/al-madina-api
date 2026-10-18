@@ -1,5 +1,5 @@
-import dotenv from 'dotenv';
-import { z } from 'zod';
+import dotenv from "dotenv";
+import { z } from "zod";
 
 dotenv.config();
 
@@ -9,62 +9,71 @@ dotenv.config();
  * the codebase can treat `config` as fully typed and guaranteed-present.
  */
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
   PORT: z.coerce.number().int().positive().default(5000),
 
-  MONGO_URI: z.string().min(1, 'MONGO_URI is required'),
-  REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
+  MONGO_URI: z.string().min(1, "MONGO_URI is required"),
+  REDIS_URL: z.string().min(1, "REDIS_URL is required"),
 
-  JWT_ACCESS_SECRET: z.string().min(16, 'JWT_ACCESS_SECRET must be at least 16 chars'),
-  JWT_ACCESS_EXPIRY: z.string().default('15m'),
-  JWT_REFRESH_EXPIRY: z.string().default('30d'),
+  JWT_ACCESS_SECRET: z
+    .string()
+    .min(16, "JWT_ACCESS_SECRET must be at least 16 chars"),
+  JWT_ACCESS_EXPIRY: z.string().default("15m"),
+  JWT_REFRESH_EXPIRY: z.string().default("30d"),
   // Absolute cap on an admin/manager session: refresh never extends past it.
-  ADMIN_SESSION_TTL: z.string().default('24h'),
+  ADMIN_SESSION_TTL: z.string().default("24h"),
 
   BCRYPT_ROUNDS: z.coerce.number().int().min(8).max(15).default(12),
 
-  CLOUDINARY_CLOUD_NAME: z.string().optional().default(''),
-  CLOUDINARY_API_KEY: z.string().optional().default(''),
-  CLOUDINARY_API_SECRET: z.string().optional().default(''),
+  CLOUDINARY_CLOUD_NAME: z.string().optional().default(""),
+  CLOUDINARY_API_KEY: z.string().optional().default(""),
+  CLOUDINARY_API_SECRET: z.string().optional().default(""),
 
-  SMTP_HOST: z.string().optional().default(''),
+  SMTP_HOST: z.string().optional().default(""),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_SECURE: z
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((v) => v === 'true'),
-  SMTP_USER: z.string().optional().default(''),
-  SMTP_PASS: z.string().optional().default(''),
-  EMAIL_FROM: z.string().default('Al Madina <noreply@almadina.com>'),
-  ADMIN_EMAIL: z.string().email().optional().default('concierge@almadina.com'),
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  SMTP_USER: z.string().optional().default(""),
+  SMTP_PASS: z.string().optional().default(""),
+  EMAIL_FROM: z.string().default("Al Madina <noreply@almadina.com>"),
+  ADMIN_EMAIL: z.string().email().optional().default("concierge@almadina.com"),
 
-  CLIENT_URL: z.string().default('http://localhost:3000'),
+  CLIENT_URL: z.string().default("http://localhost:3000"),
+  // URL schemes the mobile app may use as a payment return link (Expo Go uses `exp`).
+  MOBILE_RETURN_SCHEMES: z.string().default("almadinaittar,exp"),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
 
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:3000')
+    .default("http://localhost:3000")
     .transform((v) =>
       v
-        .split(',')
+        .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
     ),
 
   LOG_LEVEL: z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-    .default('info'),
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+    .default("info"),
 
   // HMAC secret verifying X-Webhook-Signature on POST /payments/callback.
   // Stands in for a real gateway's webhook signing secret (see
   // modules/payments/providers/index.ts for what a real gateway needs).
-  PAYMENT_WEBHOOK_SECRET: z.string().min(16).default('dev-payment-webhook-secret-change-me'),
+  PAYMENT_WEBHOOK_SECRET: z
+    .string()
+    .min(16)
+    .default("dev-payment-webhook-secret-change-me"),
 
   // Stripe (test-mode keys work). Unset => card/wallet fall back to the
   // simulated provider, so local dev needs no Stripe account.
-  STRIPE_SECRET_KEY: z.string().optional().default(''),
-  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
+  STRIPE_SECRET_KEY: z.string().optional().default(""),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -72,7 +81,7 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   // Logger is not available yet at this point, so write straight to stderr.
   // eslint-disable-next-line no-console
-  console.error('❌ Invalid environment configuration:');
+  console.error("❌ Invalid environment configuration:");
   // eslint-disable-next-line no-console
   console.error(parsed.error.flatten().fieldErrors);
   process.exit(1);
@@ -82,9 +91,9 @@ const env = parsed.data;
 
 export const config = {
   env: env.NODE_ENV,
-  isProd: env.NODE_ENV === 'production',
-  isDev: env.NODE_ENV === 'development',
-  isTest: env.NODE_ENV === 'test',
+  isProd: env.NODE_ENV === "production",
+  isDev: env.NODE_ENV === "development",
+  isTest: env.NODE_ENV === "test",
   port: env.PORT,
 
   mongo: {
@@ -100,8 +109,8 @@ export const config = {
     accessExpiry: env.JWT_ACCESS_EXPIRY,
     refreshExpiry: env.JWT_REFRESH_EXPIRY,
     adminSessionTtl: env.ADMIN_SESSION_TTL,
-    issuer: 'al-madina-api',
-    audience: 'al-madina',
+    issuer: "al-madina-api",
+    audience: "al-madina",
   },
 
   bcrypt: {
@@ -112,7 +121,11 @@ export const config = {
     cloudName: env.CLOUDINARY_CLOUD_NAME,
     apiKey: env.CLOUDINARY_API_KEY,
     apiSecret: env.CLOUDINARY_API_SECRET,
-    enabled: Boolean(env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET),
+    enabled: Boolean(
+      env.CLOUDINARY_CLOUD_NAME &&
+      env.CLOUDINARY_API_KEY &&
+      env.CLOUDINARY_API_SECRET,
+    ),
   },
 
   smtp: {
@@ -127,6 +140,9 @@ export const config = {
 
   adminEmail: env.ADMIN_EMAIL,
   clientUrl: env.CLIENT_URL,
+  mobileReturnSchemes: env.MOBILE_RETURN_SCHEMES.split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
 
   rateLimit: {
     windowMs: env.RATE_LIMIT_WINDOW_MS,
