@@ -5,6 +5,7 @@ import { productsRepository } from '../products/products.repository';
 import { resolveLinePricing } from '../products/products.service';
 import { couponsService } from '../coupons/coupons.service';
 import { paymentsService } from '../payments/payments.service';
+import { paymentsRepository } from '../payments/payments.repository';
 import { ApiError } from '../../utils/api-error';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { generateOrderReference } from '../../utils/order-reference';
@@ -47,7 +48,18 @@ export const ordersService = {
     // order already created by the first attempt instead of duplicating it.
     if (input.idempotencyKey) {
       const existing = await ordersRepository.findByIdempotencyKey(input.idempotencyKey);
-      if (existing) return existing;
+      if (existing) {
+        // The order is saved before the gateway call, so a failed first attempt (e.g. a
+        // Stripe error) leaves it with no transaction — create it now instead of returning
+        // an order the client can never pay. Fresh gateway key: Stripe caches the failed
+        // response (and rejects changed params) under the original one.
+        // ponytail: two concurrent replays can open two Checkout sessions; only one can be paid.
+        if (!(await paymentsRepository.findLatestByOrder(existing._id.toString()))) {
+          await paymentsService.initiateForOrder(existing, `${input.idempotencyKey}:${Date.now()}`, input.returnUrl);
+          return (await ordersRepository.findById(existing._id.toString())) ?? existing;
+        }
+        return existing;
+      }
     }
 
     // Resolve products and build snapshotted line items.
