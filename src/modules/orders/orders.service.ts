@@ -117,7 +117,7 @@ export const ordersService = {
     // card/wallet go 'processing' until the (simulated) gateway calls back.
     // Reuses the order's own idempotencyKey so a retried POST /orders can't
     // create a second transaction either.
-    await paymentsService.initiateForOrder(order, input.idempotencyKey ?? order._id.toString());
+    await paymentsService.initiateForOrder(order, input.idempotencyKey ?? order._id.toString(), input.returnUrl);
     // initiateForOrder updates paymentStatus via a separate write — reload so
     // the response reflects it (e.g. card/wallet -> 'processing').
     const settledOrder = (await ordersRepository.findById(order._id.toString())) ?? order;

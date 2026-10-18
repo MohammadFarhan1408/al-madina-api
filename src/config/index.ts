@@ -43,6 +43,8 @@ const envSchema = z.object({
   ADMIN_EMAIL: z.string().email().optional().default("concierge@almadina.com"),
 
   CLIENT_URL: z.string().default("http://localhost:3000"),
+  // URL schemes the mobile app may use as a payment return link (Expo Go uses `exp`).
+  MOBILE_RETURN_SCHEMES: z.string().default("almadinaittar,exp"),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
 
@@ -138,6 +140,9 @@ export const config = {
 
   adminEmail: env.ADMIN_EMAIL,
   clientUrl: env.CLIENT_URL,
+  mobileReturnSchemes: env.MOBILE_RETURN_SCHEMES.split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
 
   rateLimit: {
     windowMs: env.RATE_LIMIT_WINDOW_MS,

@@ -23,7 +23,7 @@ export const ordersController = {
   async retryPayment(req: Request, res: Response): Promise<void> {
     const guestEmail = typeof req.query.email === 'string' ? req.query.email : undefined;
     await ordersService.getById(req.params.id, req.user, guestEmail); // ownership check, throws if unauthorized
-    const transaction = await paymentsService.retryPayment(req.params.id, req.body.idempotencyKey);
+    const transaction = await paymentsService.retryPayment(req.params.id, req.body.idempotencyKey, req.body.returnUrl);
     sendCreated(res, transaction);
   },
 

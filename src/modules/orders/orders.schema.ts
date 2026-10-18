@@ -6,6 +6,7 @@ import {
   ORDER_STATUSES,
   PAGINATION,
 } from '../../constants/business';
+import { returnUrlSchema } from '../payments/payments.schema';
 
 const orderItemSchema = z.object({
   productId: z.string().refine((v) => Types.ObjectId.isValid(v), { message: 'Invalid productId' }),
@@ -33,6 +34,8 @@ export const createOrderSchema = z.object({
   // Client-generated, resent unchanged on retry — dedupes a double-submit
   // into a single order instead of creating two.
   idempotencyKey: z.string().uuid().optional(),
+  // Mobile only: app deep link Stripe returns to instead of the web storefront.
+  returnUrl: returnUrlSchema.optional(),
 });
 
 /** GET /orders query. */
